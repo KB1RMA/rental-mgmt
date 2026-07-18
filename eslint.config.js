@@ -1,9 +1,13 @@
 //  @ts-check
 
 import { tanstackConfig } from '@tanstack/eslint-config'
+import reactHooks from 'eslint-plugin-react-hooks'
+import prettierRecommended from 'eslint-plugin-prettier/recommended'
 
 export default [
   ...tanstackConfig,
+  reactHooks.configs.flat.recommended,
+  prettierRecommended,
   {
     rules: {
       'import/no-cycle': 'off',
