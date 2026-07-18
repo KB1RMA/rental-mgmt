@@ -13,7 +13,9 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedLeaseRouteImport } from './routes/_authed/lease'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiDocumentsIdRouteImport } from './routes/api/documents/$id'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -34,9 +36,19 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedLeaseRoute = AuthedLeaseRouteImport.update({
+  id: '/lease',
+  path: '/lease',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDocumentsIdRoute = ApiDocumentsIdRouteImport.update({
+  id: '/api/documents/$id',
+  path: '/api/documents/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -44,29 +56,44 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/lease': typeof AuthedLeaseRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/documents/$id': typeof ApiDocumentsIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/lease': typeof AuthedLeaseRoute
   '/': typeof AuthedIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/documents/$id': typeof ApiDocumentsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/_authed/lease': typeof AuthedLeaseRoute
   '/_authed/': typeof AuthedIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/documents/$id': typeof ApiDocumentsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/signup' | '/api/auth/$'
+  fullPaths:
+    '/' | '/login' | '/signup' | '/lease' | '/api/auth/$' | '/api/documents/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/signup' | '/' | '/api/auth/$'
+  to:
+    '/login' | '/signup' | '/lease' | '/' | '/api/auth/$' | '/api/documents/$id'
   id:
-    '__root__' | '/_authed' | '/login' | '/signup' | '/_authed/' | '/api/auth/$'
+    | '__root__'
+    | '/_authed'
+    | '/login'
+    | '/signup'
+    | '/_authed/lease'
+    | '/_authed/'
+    | '/api/auth/$'
+    | '/api/documents/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -74,6 +101,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiDocumentsIdRoute: typeof ApiDocumentsIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -106,6 +134,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/lease': {
+      id: '/_authed/lease'
+      path: '/lease'
+      fullPath: '/lease'
+      preLoaderRoute: typeof AuthedLeaseRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -113,14 +148,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/documents/$id': {
+      id: '/api/documents/$id'
+      path: '/api/documents/$id'
+      fullPath: '/api/documents/$id'
+      preLoaderRoute: typeof ApiDocumentsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AuthedRouteChildren {
+  AuthedLeaseRoute: typeof AuthedLeaseRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedLeaseRoute: AuthedLeaseRoute,
   AuthedIndexRoute: AuthedIndexRoute,
 }
 
@@ -132,6 +176,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiDocumentsIdRoute: ApiDocumentsIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
