@@ -6,6 +6,7 @@ import {
   primaryKey,
   unique,
 } from 'drizzle-orm/sqlite-core'
+import { relations } from 'drizzle-orm'
 
 export const user = sqliteTable('user', {
   id: text('id').primaryKey(),
@@ -137,11 +138,17 @@ export const leaseTenants = sqliteTable(
   (table) => [primaryKey({ columns: [table.leaseId, table.tenantId] })],
 )
 
+export const documentKinds = [
+  'lease',
+  'statement',
+  'receipt',
+  'assessor_raw',
+  'other',
+] as const
+
 export const documents = sqliteTable('documents', {
   id: id(),
-  kind: text('kind', {
-    enum: ['lease', 'statement', 'receipt', 'assessor_raw', 'other'],
-  }).notNull(),
+  kind: text('kind', { enum: documentKinds }).notNull(),
   r2Key: text('r2_key').notNull().unique(),
   filename: text('filename').notNull(),
   mimeType: text('mime_type').notNull(),
@@ -317,3 +324,48 @@ export const comparableRents = sqliteTable('comparable_rents', {
   url: text('url'),
   notedAt: text('noted_at').notNull(),
 })
+
+export const propertiesRelations = relations(properties, ({ many }) => ({
+  units: many(units),
+  documents: many(documents),
+}))
+
+export const unitsRelations = relations(units, ({ one, many }) => ({
+  property: one(properties, {
+    fields: [units.propertyId],
+    references: [properties.id],
+  }),
+  leases: many(leases),
+}))
+
+export const tenantsRelations = relations(tenants, ({ many }) => ({
+  leaseTenants: many(leaseTenants),
+}))
+
+export const leasesRelations = relations(leases, ({ one, many }) => ({
+  unit: one(units, { fields: [leases.unitId], references: [units.id] }),
+  leaseTenants: many(leaseTenants),
+  documents: many(documents),
+}))
+
+export const leaseTenantsRelations = relations(leaseTenants, ({ one }) => ({
+  lease: one(leases, {
+    fields: [leaseTenants.leaseId],
+    references: [leases.id],
+  }),
+  tenant: one(tenants, {
+    fields: [leaseTenants.tenantId],
+    references: [tenants.id],
+  }),
+}))
+
+export const documentsRelations = relations(documents, ({ one }) => ({
+  property: one(properties, {
+    fields: [documents.propertyId],
+    references: [properties.id],
+  }),
+  lease: one(leases, {
+    fields: [documents.leaseId],
+    references: [leases.id],
+  }),
+}))
