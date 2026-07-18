@@ -12,8 +12,6 @@ dist-ssr
 __unconfig*
 todos.json
 _docs
-.dev.vars
-.dev.vars.*
 test-results
 playwright-report
 blob-report

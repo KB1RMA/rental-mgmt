@@ -11,8 +11,7 @@
     {
       "binding": "DB",
       "database_name": "rental-mgmt-db",
-      // placeholder until `wrangler d1 create rental-mgmt-db` has run
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "database_id": "e84fe6e8-5395-4230-801c-f08d7d62f7f9",
       "migrations_dir": "migrations",
     },
   ],
