@@ -1,0 +1,26 @@
+name: E2E
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - run: npm ci
+      - run: npm run cf-typegen
+      - name: Write ephemeral .dev.vars
+        run: |
+          echo "BETTER_AUTH_URL=http://localhost:3000" >> .dev.vars
+          echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> .dev.vars
+      - run: npx playwright install --with-deps chromium
+      - run: npm run db:migrate:local
+      - run: npm run test:e2e
+        env:
+          CI: true
