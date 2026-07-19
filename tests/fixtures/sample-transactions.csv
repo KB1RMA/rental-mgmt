@@ -1,0 +1,7 @@
+Date,Name,Notes,Details,Category,Sub-Category,Amount,Portfolio,Property,Unit,Data Source,Account,Owner,Attachments,Portfolio ID,Tenancy ID
+04/01/2026,Remote Deposit,Remote Deposit,,Income,Rents,2950.0,Example Portfolio,123 Example Street,1,Example Bank,Checking,,,,
+04/09/2026,Check,Check,,Repairs & Maintenance,Plumbing Repairs,-189.34,Example Portfolio,123 Example Street,1,Example Bank,Checking,,,,
+02/02/2026,Example Mortgage Co,MORTGAGE AUTO PAY,,Mortgages & Loans,Mortgage Payment,-1200.00,Example Portfolio,123 Example Street,1,Example Bank,Checking,,,,
+06/30/2026,Ici Fee Example,POS Purchase Non-PIN ICI*FEE,,,,-9.04,Example Portfolio,123 Example Street,1,Example Bank,Checking,,,,
+05/04/2026,Safety Deposit,Safety deposit TO: EXAMPLE1234,,Transfers,Owner Distributions,-500.00,Example Portfolio,123 Example Street,1,Example Bank,Checking,,,,
+06/08/2026,Mystery Fee Example,Some unrecognized wire fee,,,,-2210.00,Example Portfolio,123 Example Street,1,Example Bank,Checking,,,,

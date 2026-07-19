@@ -9,12 +9,20 @@ function Dashboard() {
       <p className="mt-2 text-neutral-600 dark:text-neutral-400">
         Lease, transactions, and renewal data will show up here.
       </p>
-      <Link
-        to="/lease"
-        className="mt-4 inline-block text-blue-600 underline dark:text-blue-400"
-      >
-        View lease
-      </Link>
+      <div className="mt-4 flex gap-4">
+        <Link
+          to="/lease"
+          className="text-blue-600 underline dark:text-blue-400"
+        >
+          View lease
+        </Link>
+        <Link
+          to="/transactions"
+          className="text-blue-600 underline dark:text-blue-400"
+        >
+          Transactions
+        </Link>
+      </div>
     </div>
   )
 }

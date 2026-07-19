@@ -13,6 +13,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedLeaseRouteImport } from './routes/_authed/lease'
+import { Route as AuthedTransactionsRouteImport } from './routes/_authed/transactions'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiDocumentsIdRouteImport } from './routes/api/documents/$id'
 
@@ -35,6 +36,11 @@ const AuthedLeaseRoute = AuthedLeaseRouteImport.update({
   path: '/lease',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedTransactionsRoute = AuthedTransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -50,12 +56,14 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
   '/lease': typeof AuthedLeaseRoute
+  '/transactions': typeof AuthedTransactionsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/documents/$id': typeof ApiDocumentsIdRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/lease': typeof AuthedLeaseRoute
+  '/transactions': typeof AuthedTransactionsRoute
   '/': typeof AuthedIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/documents/$id': typeof ApiDocumentsIdRoute
@@ -65,20 +73,34 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authed/lease': typeof AuthedLeaseRoute
+  '/_authed/transactions': typeof AuthedTransactionsRoute
   '/_authed/': typeof AuthedIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/documents/$id': typeof ApiDocumentsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/lease' | '/api/auth/$' | '/api/documents/$id'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/lease'
+    | '/transactions'
+    | '/api/auth/$'
+    | '/api/documents/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/login' | '/lease' | '/' | '/api/auth/$' | '/api/documents/$id'
+  to:
+    | '/login'
+    | '/lease'
+    | '/transactions'
+    | '/'
+    | '/api/auth/$'
+    | '/api/documents/$id'
   id:
     | '__root__'
     | '/_authed'
     | '/login'
     | '/_authed/lease'
+    | '/_authed/transactions'
     | '/_authed/'
     | '/api/auth/$'
     | '/api/documents/$id'
@@ -121,6 +143,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedLeaseRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/transactions': {
+      id: '/_authed/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof AuthedTransactionsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -140,11 +169,13 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedLeaseRoute: typeof AuthedLeaseRoute
+  AuthedTransactionsRoute: typeof AuthedTransactionsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedLeaseRoute: AuthedLeaseRoute,
+  AuthedTransactionsRoute: AuthedTransactionsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
 }
 
