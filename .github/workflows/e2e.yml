@@ -21,6 +21,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run db:migrate:local
       - run: npm run db:seed:example:local
+      - run: npm run db:seed:test-user:local
       - run: npm run test:e2e
         env:
           CI: true

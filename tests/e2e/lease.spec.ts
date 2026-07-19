@@ -9,19 +9,17 @@ const fixtureDocPath = fileURLToPath(
   new URL('../fixtures/sample-document.txt', import.meta.url),
 )
 
-async function signUp(page: Page) {
-  const email = `lease-e2e-${Date.now()}@example.com`
-  await page.goto('/signup')
+async function signIn(page: Page) {
+  await page.goto('/login')
   await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-  await page.getByLabel('Name').fill('Lease E2E')
-  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Email').fill('e2e-test@example.com')
   await page.getByLabel('Password').fill('correct horse battery staple')
-  await page.getByRole('button', { name: 'Create account' }).click()
+  await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page).toHaveURL('/')
 }
 
 test('lease page shows seeded terms and renewal deadline', async ({ page }) => {
-  await signUp(page)
+  await signIn(page)
   await page.goto('/lease')
 
   await expect(
@@ -35,7 +33,7 @@ test('lease page shows seeded terms and renewal deadline', async ({ page }) => {
 test('uploads a document and downloads it back byte-identical', async ({
   page,
 }) => {
-  await signUp(page)
+  await signIn(page)
   await page.goto('/lease')
   await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
 

@@ -13,8 +13,7 @@ export const auth = betterAuth({
   trustedOrigins: [env.BETTER_AUTH_URL],
   emailAndPassword: {
     enabled: true,
-    // Bootstrap only: flip to true once the one admin account exists (see /signup).
-    disableSignUp: false,
+    disableSignUp: true,
   },
   plugins: [tanstackStartCookies()],
 })

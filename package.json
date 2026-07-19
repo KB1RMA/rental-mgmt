@@ -16,6 +16,7 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "db:seed:example:local": "wrangler d1 execute rental-mgmt-db --local --file=./scripts/seed-lease.example.sql",
+    "db:seed:test-user:local": "wrangler d1 execute rental-mgmt-db --local --file=./scripts/seed-test-user.sql",
     "lint": "eslint",
     "format": "prettier --write . && eslint --fix",
     "check": "prettier --check .",
