@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 
 import { getSession } from '#/lib/get-session'
 import BetterAuthHeader from '#/integrations/better-auth/header-user'
+import SidebarNav from '#/components/sidebar-nav'
 
 export const Route = createFileRoute('/_authed')({
   beforeLoad: async ({ location }) => {
@@ -19,14 +20,16 @@ export const Route = createFileRoute('/_authed')({
 
 function AuthedLayout() {
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-neutral-200 px-6 py-3 dark:border-neutral-800">
-        <span className="font-semibold">123 Example Street</span>
-        <BetterAuthHeader />
-      </header>
-      <main>
-        <Outlet />
-      </main>
+    <div className="flex min-h-screen">
+      <SidebarNav />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-14 items-center justify-end border-b border-neutral-200 px-6 dark:border-neutral-800">
+          <BetterAuthHeader />
+        </header>
+        <main className="flex-1">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
