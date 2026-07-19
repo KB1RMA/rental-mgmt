@@ -5,17 +5,26 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { getActiveLeaseData } from '#/lib/lease.functions'
 import { uploadDocument } from '#/lib/documents.functions'
 import { documentKinds } from '#/db/schema'
+import { formatCents } from '#/lib/format'
+import { syncAndGetRentLedger } from '#/lib/rent-ledger.functions'
+import { cn } from '#/lib/cn'
 
 export const Route = createFileRoute('/_authed/lease')({
-  loader: () => getActiveLeaseData(),
+  loader: async () => {
+    const [lease, rentLedger] = await Promise.all([
+      getActiveLeaseData(),
+      syncAndGetRentLedger(),
+    ])
+    return { lease, rentLedger }
+  },
   component: LeasePage,
 })
 
-function formatCents(cents: number) {
-  return (cents / 100).toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  })
+const statusStyles: Record<string, string> = {
+  paid: 'text-green-700 dark:text-green-400',
+  partial: 'text-amber-600 dark:text-amber-400',
+  due: 'text-neutral-600 dark:text-neutral-400',
+  late: 'text-red-600 dark:text-red-400',
 }
 
 function renewalNoticeDeadline(endDate: string, noticeDays: number) {
@@ -25,7 +34,7 @@ function renewalNoticeDeadline(endDate: string, noticeDays: number) {
 }
 
 function LeasePage() {
-  const lease = Route.useLoaderData()
+  const { lease, rentLedger } = Route.useLoaderData()
   const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +66,7 @@ function LeasePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-8">
+    <div className="mx-auto max-w-3xl p-8">
       <h1 className="text-3xl font-bold">{lease.unit.property.name}</h1>
       <p className="text-neutral-600 dark:text-neutral-400">
         {lease.unit.property.addressLine1}, {lease.unit.property.city},{' '}
@@ -97,6 +106,50 @@ function LeasePage() {
           </dd>
         </div>
       </dl>
+
+      <h2 className="mt-8 text-xl font-semibold">Rent ledger</h2>
+      <table className="mt-2 w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-neutral-200 dark:border-neutral-800">
+            <th className="py-2 pr-4">Period</th>
+            <th className="py-2 pr-4">Due date</th>
+            <th className="py-2 pr-4 text-right">Amount</th>
+            <th className="py-2 pr-4 text-right">Paid</th>
+            <th className="py-2 pr-4">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {(rentLedger ?? []).map((charge) => {
+            const paidCents = charge.rentPayments.reduce(
+              (sum, payment) => sum + payment.amountCents,
+              0,
+            )
+            return (
+              <tr
+                key={charge.id}
+                className="border-b border-neutral-100 dark:border-neutral-900"
+              >
+                <td className="py-2 pr-4">{charge.period}</td>
+                <td className="py-2 pr-4">{charge.dueDate}</td>
+                <td className="py-2 pr-4 text-right">
+                  {formatCents(charge.amountCents)}
+                </td>
+                <td className="py-2 pr-4 text-right">
+                  {formatCents(paidCents)}
+                </td>
+                <td
+                  className={cn(
+                    'py-2 pr-4 capitalize',
+                    statusStyles[charge.status],
+                  )}
+                >
+                  {charge.status}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
 
       <h2 className="mt-8 text-xl font-semibold">Documents</h2>
       <ul className="mt-2 space-y-1">
