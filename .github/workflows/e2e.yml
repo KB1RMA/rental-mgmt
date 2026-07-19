@@ -21,6 +21,7 @@ jobs:
           echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> .env
       - run: npx playwright install --with-deps chromium
       - run: npm run db:migrate:local
+      - run: npm run db:seed:example:local
       - run: npm run test:e2e
         env:
           CI: true

@@ -12,6 +12,7 @@ dist-ssr
 __unconfig*
 todos.json
 _docs
+scripts/seed-lease.sql
 test-results
 playwright-report
 blob-report

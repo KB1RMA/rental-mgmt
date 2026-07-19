@@ -1,0 +1,2 @@
+This is a placeholder document used only by the e2e upload/download test.
+It contains no real lease data or personal information.
