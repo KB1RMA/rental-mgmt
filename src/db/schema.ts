@@ -251,7 +251,9 @@ export const transactions = sqliteTable('transactions', {
   categoryId: text('category_id').references(() => categories.id, {
     onDelete: 'set null',
   }),
-  categorizedBy: text('categorized_by', { enum: ['rule', 'manual'] }),
+  categorizedBy: text('categorized_by', {
+    enum: ['imported', 'rule', 'manual'],
+  }),
   notes: text('notes'),
   createdAt: createdAt(),
 })
@@ -346,6 +348,7 @@ export const leasesRelations = relations(leases, ({ one, many }) => ({
   unit: one(units, { fields: [leases.unitId], references: [units.id] }),
   leaseTenants: many(leaseTenants),
   documents: many(documents),
+  rentCharges: many(rentCharges),
 }))
 
 export const leaseTenantsRelations = relations(leaseTenants, ({ one }) => ({
@@ -367,5 +370,54 @@ export const documentsRelations = relations(documents, ({ one }) => ({
   lease: one(leases, {
     fields: [documents.leaseId],
     references: [leases.id],
+  }),
+}))
+
+export const categoriesRelations = relations(categories, ({ many }) => ({
+  categorizationRules: many(categorizationRules),
+  transactions: many(transactions),
+}))
+
+export const categorizationRulesRelations = relations(
+  categorizationRules,
+  ({ one }) => ({
+    category: one(categories, {
+      fields: [categorizationRules.categoryId],
+      references: [categories.id],
+    }),
+  }),
+)
+
+export const transactionsRelations = relations(
+  transactions,
+  ({ one, many }) => ({
+    property: one(properties, {
+      fields: [transactions.propertyId],
+      references: [properties.id],
+    }),
+    category: one(categories, {
+      fields: [transactions.categoryId],
+      references: [categories.id],
+    }),
+    rentPayments: many(rentPayments),
+  }),
+)
+
+export const rentChargesRelations = relations(rentCharges, ({ one, many }) => ({
+  lease: one(leases, {
+    fields: [rentCharges.leaseId],
+    references: [leases.id],
+  }),
+  rentPayments: many(rentPayments),
+}))
+
+export const rentPaymentsRelations = relations(rentPayments, ({ one }) => ({
+  rentCharge: one(rentCharges, {
+    fields: [rentPayments.rentChargeId],
+    references: [rentCharges.id],
+  }),
+  transaction: one(transactions, {
+    fields: [rentPayments.transactionId],
+    references: [transactions.id],
   }),
 }))

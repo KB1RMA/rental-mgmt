@@ -15,6 +15,13 @@
       "when": 1784406091886,
       "tag": "0001_colossal_grandmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784423892059,
+      "tag": "0002_seed_categories",
+      "breakpoints": true
     }
   ]
 }

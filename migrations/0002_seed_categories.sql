@@ -1,0 +1,20 @@
+-- Custom SQL migration file, put your code below! --
+INSERT INTO categories (id, name, type, schedule_e_line) VALUES
+  ('93acc0fa-85cc-4300-8f43-f3755da69e2b', 'Rent Income', 'income', NULL),
+  ('08e5b3bb-f466-4970-986b-41c7ae008e19', 'Advertising', 'expense', 'advertising'),
+  ('a4569d00-e218-42a8-8379-a3e339deaf89', 'Auto & Travel', 'expense', 'auto_travel'),
+  ('0d66f427-41c5-4152-84d3-4609df323041', 'Cleaning & Maintenance', 'expense', 'cleaning_maintenance'),
+  ('64f2a0c7-125b-490a-b0a5-e9145f54d097', 'Commissions', 'expense', 'commissions'),
+  ('baa026a8-f39b-4c52-a1e5-793269d260b5', 'Insurance', 'expense', 'insurance'),
+  ('be032fa3-e122-4441-a770-f6b4e37b3028', 'Legal & Professional Fees', 'expense', 'legal_professional'),
+  ('eea452ef-aa0c-4086-8c1a-1281175c0145', 'Management Fees', 'expense', 'management_fees'),
+  ('a4ba3ac4-483e-4bfe-9c5f-f98d24e37173', 'Mortgage Interest', 'expense', 'mortgage_interest'),
+  ('ac63ebf9-6b2e-4ab0-aa96-891bcb1a9fe9', 'Other Interest', 'expense', 'other_interest'),
+  ('9f30bd5a-acac-4e4c-a3cb-cf781a8845b2', 'Repairs', 'expense', 'repairs'),
+  ('4302f4ee-8077-4d8a-8e2e-b89e14dda509', 'Supplies', 'expense', 'supplies'),
+  ('d6ac60ee-5935-4be3-936c-8f9297929220', 'Taxes', 'expense', 'taxes'),
+  ('8b564b98-0bf2-470f-8a79-080b375bd4d8', 'Utilities', 'expense', 'utilities'),
+  ('99e6741d-37cc-4d54-9332-1f17a550788b', 'Depreciation', 'expense', 'depreciation'),
+  ('62046bd7-c4f1-4008-a65f-575dc6b398bc', 'Other Expenses', 'expense', 'other'),
+  ('11382258-499c-4ef2-806a-ee86f1e7e7cd', 'Security Deposits', 'transfer', NULL),
+  ('7ce2eaa8-6672-4274-b957-cd0deabfdb40', 'Owner Distributions', 'transfer', NULL);
