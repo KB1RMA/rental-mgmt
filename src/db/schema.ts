@@ -258,6 +258,19 @@ export const transactions = sqliteTable('transactions', {
   createdAt: createdAt(),
 })
 
+export const transactionSplits = sqliteTable('transaction_splits', {
+  id: id(),
+  transactionId: text('transaction_id')
+    .notNull()
+    .references(() => transactions.id, { onDelete: 'cascade' }),
+  categoryId: text('category_id')
+    .notNull()
+    .references(() => categories.id, { onDelete: 'cascade' }),
+  amountCents: integer('amount_cents').notNull(),
+  notes: text('notes'),
+  createdAt: createdAt(),
+})
+
 export const rentCharges = sqliteTable(
   'rent_charges',
   {
@@ -376,6 +389,7 @@ export const documentsRelations = relations(documents, ({ one }) => ({
 export const categoriesRelations = relations(categories, ({ many }) => ({
   categorizationRules: many(categorizationRules),
   transactions: many(transactions),
+  transactionSplits: many(transactionSplits),
 }))
 
 export const categorizationRulesRelations = relations(
@@ -400,6 +414,21 @@ export const transactionsRelations = relations(
       references: [categories.id],
     }),
     rentPayments: many(rentPayments),
+    splits: many(transactionSplits),
+  }),
+)
+
+export const transactionSplitsRelations = relations(
+  transactionSplits,
+  ({ one }) => ({
+    transaction: one(transactions, {
+      fields: [transactionSplits.transactionId],
+      references: [transactions.id],
+    }),
+    category: one(categories, {
+      fields: [transactionSplits.categoryId],
+      references: [categories.id],
+    }),
   }),
 )
 

@@ -9,12 +9,16 @@ const fixtureCsvPath = fileURLToPath(
 const bankStatementFixturePath = fileURLToPath(
   new URL('../fixtures/sample-bank-statement.csv', import.meta.url),
 )
+const moveInPaymentFixturePath = fileURLToPath(
+  new URL('../fixtures/sample-move-in-payment.csv', import.meta.url),
+)
 
 // Category IDs from migrations/0002_seed_categories.sql — stable across environments.
 const RENT_INCOME_ID = '93acc0fa-85cc-4300-8f43-f3755da69e2b'
 const REPAIRS_ID = '9f30bd5a-acac-4e4c-a3cb-cf781a8845b2'
 const OTHER_EXPENSES_ID = '62046bd7-c4f1-4008-a65f-575dc6b398bc'
 const MORTGAGE_INTEREST_ID = 'a4ba3ac4-483e-4bfe-9c5f-f98d24e37173'
+const SECURITY_DEPOSITS_ID = '11382258-499c-4ef2-806a-ee86f1e7e7cd'
 
 async function signIn(page: Page) {
   await page.goto('/login')
@@ -101,4 +105,48 @@ test('imports a bank statement export and applies the rules engine', async ({
 
   const atmRow = page.locator('tr', { hasText: 'ATM Withdrawal' })
   await expect(atmRow.locator('select')).toHaveValue('')
+})
+
+test('splits a lump-sum payment into multiple categories', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/transactions')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+
+  await page.getByLabel('Source').selectOption('bank-statement')
+  await page.getByLabel('Import CSV').setInputFiles(moveInPaymentFixturePath)
+  await page.getByRole('button', { name: 'Import', exact: true }).click()
+  await expect(page.getByText(/Imported 1,/)).toBeVisible()
+
+  const row = page.locator('tr', { hasText: '$7,375.00' })
+  await row.getByRole('button', { name: 'Split' }).click()
+
+  const categorySelects = page.locator('select', { hasText: 'Choose category' })
+  await categorySelects.nth(0).selectOption(RENT_INCOME_ID)
+  await page.locator('input[type=number]').nth(0).fill('1475.00')
+  await categorySelects.nth(1).selectOption(RENT_INCOME_ID)
+  await page.locator('input[type=number]').nth(1).fill('2950.00')
+
+  // Totals don't match yet ($4,425 of $7,375) — Save should refuse.
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByText(/Lines total/)).toBeVisible()
+
+  await page.getByText('Add line').click()
+  const categorySelectsAfterAdd = page.locator('select', {
+    hasText: 'Choose category',
+  })
+  await categorySelectsAfterAdd.nth(2).selectOption(SECURITY_DEPOSITS_ID)
+  await page.locator('input[type=number]').nth(2).fill('2950.00')
+
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  const savedRow = page.locator('tr', { hasText: '$7,375.00' })
+  await expect(savedRow.getByText('Rent Income: $1,475.00')).toBeVisible()
+  await expect(savedRow.getByText('Rent Income: $2,950.00')).toBeVisible()
+  await expect(savedRow.getByText('Security Deposits: $2,950.00')).toBeVisible()
+
+  await page.reload()
+  const reloadedRow = page.locator('tr', { hasText: '$7,375.00' })
+  await expect(
+    reloadedRow.getByText('Security Deposits: $2,950.00'),
+  ).toBeVisible()
 })

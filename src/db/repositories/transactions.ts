@@ -19,7 +19,10 @@ export function createTransaction(input: NewTransaction) {
 
 export function listTransactionsWithCategory() {
   return db.query.transactions.findMany({
-    with: { category: true },
+    with: {
+      category: true,
+      splits: { with: { category: true } },
+    },
     orderBy: desc(transactions.postedDate),
   })
 }
