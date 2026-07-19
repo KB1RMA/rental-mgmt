@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { SubmitEvent } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { ClientOnly, createFileRoute, useRouter } from '@tanstack/react-router'
 
 import {
   getRenewalPageData,
@@ -12,6 +12,7 @@ import { formatCents } from '#/lib/format'
 import { cn } from '#/lib/cn'
 import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
+import { MonthlyPnlChart } from '#/components/monthly-pnl-chart'
 
 export const Route = createFileRoute('/_authed/renewal')({
   loader: () => getRenewalPageData(),
@@ -47,9 +48,10 @@ function RenewalPage() {
   const [monthlyPrincipal, setMonthlyPrincipal] = useState(() =>
     data.seeds ? dollarsFromCents(data.seeds.monthlyPrincipalCents) : '0',
   )
-  const [monthlyExpenseOverride, setMonthlyExpenseOverride] = useState(() =>
-    dollarsFromCents(data.assumptions?.monthlyExpenseOverrideCents ?? 0),
-  )
+  const [monthlyExpenseOverride, setMonthlyExpenseOverride] = useState(() => {
+    const overrideCents = data.assumptions?.monthlyExpenseOverrideCents
+    return overrideCents == null ? '' : dollarsFromCents(overrideCents)
+  })
   const [notes, setNotes] = useState(data.assumptions?.notes ?? '')
 
   const projection = useMemo(() => {
@@ -148,6 +150,13 @@ function RenewalPage() {
       </p>
 
       <h2 className="mt-8 text-xl font-semibold">Monthly P&L</h2>
+      <ClientOnly
+        fallback={<div className="mt-2 h-72 w-full" data-testid="pnl-chart" />}
+      >
+        <div data-testid="pnl-chart">
+          <MonthlyPnlChart rows={pnl.rows} view={view} />
+        </div>
+      </ClientOnly>
       {totalUncategorized > 0 && (
         <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
           {totalUncategorized} uncategorized transaction
@@ -173,11 +182,12 @@ function RenewalPage() {
             >
               <td className="py-2 pr-4">
                 {row.period}
-                {row.mortgagePaymentCount !== 1 && (
-                  <sup className="ml-1 text-neutral-500">
-                    {row.mortgagePaymentCount}×mtg
-                  </sup>
-                )}
+                {row.mortgagePaymentCount !== 1 &&
+                  (row.expenseCents > 0 || row.incomeCents > 0) && (
+                    <sup className="ml-1 text-neutral-500">
+                      {row.mortgagePaymentCount}×mtg
+                    </sup>
+                  )}
               </td>
               <td className="py-2 pr-4 text-right">
                 {formatCents(row.incomeCents)}
@@ -300,6 +310,7 @@ function RenewalPage() {
             name="monthlyExpenseOverride"
             type="number"
             step="0.01"
+            placeholder={dollarsFromCents(data.seeds.monthlyExpenseCents)}
             value={monthlyExpenseOverride}
             onChange={(e) => setMonthlyExpenseOverride(e.target.value)}
             className={inputClass}
