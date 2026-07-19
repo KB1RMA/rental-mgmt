@@ -150,3 +150,23 @@ test('splits a lump-sum payment into multiple categories', async ({ page }) => {
     reloadedRow.getByText('Security Deposits: $2,950.00'),
   ).toBeVisible()
 })
+
+test('deleting a transaction removes it from the table', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/transactions')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+
+  // Relies on the "Mystery Fee Example" transaction imported by an earlier
+  // test in this file (tests in this spec run sequentially and share state).
+  const row = page.locator('tr', { hasText: 'Mystery Fee Example' })
+  await expect(row).toBeVisible()
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await row.getByRole('button', { name: 'Delete' }).click()
+  await expect(row).not.toBeVisible()
+
+  await page.reload()
+  await expect(
+    page.locator('tr', { hasText: 'Mystery Fee Example' }),
+  ).not.toBeVisible()
+})

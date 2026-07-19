@@ -48,3 +48,7 @@ export function updateTransactionCategory(id: string, categoryId: string) {
     .returning()
     .get()
 }
+
+export function deleteTransactionById(id: string) {
+  return db.delete(transactions).where(eq(transactions.id, id)).run()
+}

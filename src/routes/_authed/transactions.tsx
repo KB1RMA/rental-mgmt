@@ -3,6 +3,7 @@ import type { SubmitEvent } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 
 import {
+  deleteTransaction,
   getTransactionsPageData,
   recategorizeTransaction,
 } from '#/lib/transactions.functions'
@@ -68,6 +69,12 @@ function TransactionsPage() {
     await router.invalidate()
   }
 
+  async function handleDelete(transactionId: string) {
+    if (!confirm('Delete this transaction? This cannot be undone.')) return
+    await retryOnce(() => deleteTransaction({ data: { transactionId } }))
+    await router.invalidate()
+  }
+
   return (
     <div className="mx-auto max-w-4xl p-8">
       <h1 className="text-3xl font-bold">Transactions</h1>
@@ -121,6 +128,7 @@ function TransactionsPage() {
             <th className="py-2 pr-4 text-right">Amount</th>
             <th className="py-2 pr-4">Category</th>
             <th className="py-2 pr-4">Schedule E</th>
+            <th className="py-2 pr-4" />
           </tr>
         </thead>
         <tbody>
@@ -131,11 +139,12 @@ function TransactionsPage() {
               categories={categories}
               onRecategorize={handleRecategorize}
               onSaveSplits={handleSaveSplits}
+              onDelete={handleDelete}
             />
           ))}
           {transactions.length === 0 && (
             <tr>
-              <td colSpan={5} className="py-4 text-neutral-500">
+              <td colSpan={6} className="py-4 text-neutral-500">
                 No transactions yet. Import a CSV to get started.
               </td>
             </tr>
@@ -156,6 +165,7 @@ function TransactionRow({
   categories,
   onRecategorize,
   onSaveSplits,
+  onDelete,
 }: {
   transaction: TransactionRow
   categories: Category[]
@@ -164,6 +174,7 @@ function TransactionRow({
     transactionId: string,
     splits: { categoryId: string; amountCents: number }[],
   ) => Promise<void>
+  onDelete: (transactionId: string) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
   const [lines, setLines] = useState<SplitLine[]>([])
@@ -338,10 +349,19 @@ function TransactionRow({
             formatScheduleELine(transaction.category?.scheduleELine)
           )}
         </td>
+        <td className="py-2 pr-4 text-right whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => void onDelete(transaction.id)}
+            className="text-xs text-red-600 underline dark:text-red-400"
+          >
+            Delete
+          </button>
+        </td>
       </tr>
       {editing && (
         <tr className="border-b border-neutral-100 bg-neutral-50 dark:border-neutral-900 dark:bg-neutral-900">
-          <td colSpan={5} className="p-3">
+          <td colSpan={6} className="p-3">
             <p className="text-xs text-neutral-500">
               Split {formatCents(targetCents)} into multiple categories
             </p>
