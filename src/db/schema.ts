@@ -207,12 +207,17 @@ export const scheduleELines = [
   'other',
 ] as const
 
+export const categoryTypes = [
+  'income',
+  'expense',
+  'transfer',
+  'ignore',
+] as const
+
 export const categories = sqliteTable('categories', {
   id: id(),
   name: text('name').notNull(),
-  type: text('type', {
-    enum: ['income', 'expense', 'transfer', 'ignore'],
-  }).notNull(),
+  type: text('type', { enum: categoryTypes }).notNull(),
   scheduleELine: text('schedule_e_line', { enum: scheduleELines }),
 })
 

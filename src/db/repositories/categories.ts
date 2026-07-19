@@ -23,3 +23,21 @@ export type NewCategorizationRule = typeof categorizationRules.$inferInsert
 export function createCategorizationRule(input: NewCategorizationRule) {
   return db.insert(categorizationRules).values(input).returning().get()
 }
+
+export type NewCategory = typeof categories.$inferInsert
+
+export function createCategory(input: NewCategory) {
+  return db.insert(categories).values(input).returning().get()
+}
+
+export function updateCategory(
+  id: string,
+  input: Partial<Pick<NewCategory, 'name' | 'type' | 'scheduleELine'>>,
+) {
+  return db
+    .update(categories)
+    .set(input)
+    .where(eq(categories.id, id))
+    .returning()
+    .get()
+}

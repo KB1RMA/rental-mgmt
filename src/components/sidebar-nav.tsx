@@ -7,6 +7,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Receipt,
+  Tags,
   TrendingUp,
 } from 'lucide-react'
 
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/lease', label: 'Lease', icon: FileText },
   { to: '/transactions', label: 'Transactions', icon: Receipt },
+  { to: '/categories', label: 'Categories', icon: Tags },
   { to: '/tax-assessments', label: 'Tax Assessments', icon: Landmark },
   { to: '/renewal', label: 'Renewal', icon: TrendingUp },
 ] as const

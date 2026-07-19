@@ -9,7 +9,7 @@ import {
 import { importTransactionsCsv } from '#/lib/transactions-import.functions'
 import type { ImportSummary } from '#/lib/transactions-import.functions'
 import { saveTransactionSplits } from '#/lib/transaction-splits.functions'
-import { formatCents } from '#/lib/format'
+import { formatCents, formatScheduleELine } from '#/lib/format'
 import { cn } from '#/lib/cn'
 import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
@@ -120,6 +120,7 @@ function TransactionsPage() {
             <th className="py-2 pr-4">Description</th>
             <th className="py-2 pr-4 text-right">Amount</th>
             <th className="py-2 pr-4">Category</th>
+            <th className="py-2 pr-4">Schedule E</th>
           </tr>
         </thead>
         <tbody>
@@ -134,7 +135,7 @@ function TransactionsPage() {
           ))}
           {transactions.length === 0 && (
             <tr>
-              <td colSpan={4} className="py-4 text-neutral-500">
+              <td colSpan={5} className="py-4 text-neutral-500">
                 No transactions yet. Import a CSV to get started.
               </td>
             </tr>
@@ -320,10 +321,27 @@ function TransactionRow({
             </div>
           )}
         </td>
+        <td className="py-2 pr-4 text-xs text-neutral-600 dark:text-neutral-400">
+          {transaction.splits.length > 0 ? (
+            <ul>
+              {[
+                ...new Set(
+                  transaction.splits.map((split) =>
+                    formatScheduleELine(split.category.scheduleELine),
+                  ),
+                ),
+              ].map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          ) : (
+            formatScheduleELine(transaction.category?.scheduleELine)
+          )}
+        </td>
       </tr>
       {editing && (
         <tr className="border-b border-neutral-100 bg-neutral-50 dark:border-neutral-900 dark:bg-neutral-900">
-          <td colSpan={4} className="p-3">
+          <td colSpan={5} className="p-3">
             <p className="text-xs text-neutral-500">
               Split {formatCents(targetCents)} into multiple categories
             </p>
