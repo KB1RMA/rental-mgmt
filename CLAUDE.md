@@ -49,7 +49,7 @@ Original plan: `/Users/chris/.claude/plans/i-want-to-build-prancy-quail.md` (may
 - ✅ Phase 3: CSV import, categorization, rent ledger (+ bank-statement format and transaction splits added afterward, not in the original plan)
 - ⏳ Phase 4: Plaid sync via cron — not started
 - ✅ Phase 5: Assessor data (amended — see below)
-- ⏳ Phase 6: Renewal decision dashboard — not started
+- ✅ Phase 6: Renewal decision dashboard (see below)
 
 ### Phase 5 (assessor data) — amended approach
 
@@ -59,3 +59,10 @@ Original plan called for server-side scraping (HTMLRewriter, R2 archive, cron). 
 - The app has a `/tax-assessments` page: CSV import (upserts on the `(propertyId, fiscalYear)` unique key — re-uploading the same file is idempotent), a manual-entry/correction form, and a history table with per-row delete. See `src/lib/csv/parse-tax-assessments.ts`, `src/lib/tax-assessments.functions.ts`, `src/db/repositories/tax-assessments.ts`.
 - To get real data into production: run the scrape script locally, then upload the resulting `_docs/tax-assessments.csv` through the deployed `/tax-assessments` UI by hand. Nothing scraped ever touches git or gets written directly to the DB.
 - `rawDocumentId`/`scrapedAt` columns on `tax_assessments` are unused by this flow (raw HTML lives in local `_docs/`, not R2) — left null.
+
+### Phase 6 (renewal decision dashboard)
+
+- `/renewal` shows a monthly P&L since the active lease's start (income vs expenses, classified via `categories.type`/`scheduleELine`, not transaction sign) and an editable, persisted rent-renewal projection. Pure math in `src/lib/profit/monthly-pnl.ts` and `projection.ts`; orchestration in `src/lib/renewal.functions.ts`.
+- Two views, toggled client-side: **cash flow** (every dollar out, including the full mortgage payment) and **operating** (excludes an editable monthly mortgage-principal estimate). The mortgage payment is categorized as one lump `Mortgage Interest`/`mortgage_interest` transaction that already includes the escrowed property tax — `tax_assessments.annualTaxCents` is shown as informational context only and is never added as a separate expense (would double-count).
+- Projection assumptions (`proposedRentCents`, `monthlyPrincipalCents`, optional `monthlyExpenseOverrideCents`, `notes`) persist in the new `renewal_assumptions` table, one row per property, upserted like `tax_assessments`. Left blank, the expense assumption seeds from the trailing-12-month actuals average (excluding the current in-progress month).
+- Chart: Recharts (`src/components/monthly-pnl-chart.tsx`), rendered inside `ClientOnly` since it needs the DOM to measure itself. Colors follow the dataviz skill's validated categorical palette, not ad hoc hex values.
