@@ -2,6 +2,8 @@ import { createServerFn } from '@tanstack/react-start'
 
 import { authMiddleware } from '#/lib/auth-middleware'
 import { parseTransactionsCsv } from '#/lib/csv/parse'
+import type { CsvParseResult } from '#/lib/csv/parse'
+import { parseBankStatementCsv } from '#/lib/csv/parse-bank-statement'
 import { mapSourceCategory } from '#/lib/csv/category-mapping'
 import { matchCategorizationRule } from '#/lib/rules/engine'
 import {
@@ -14,6 +16,9 @@ import {
 } from '#/db/repositories/transactions'
 import { listProperties } from '#/db/repositories/properties'
 
+export const csvImportFormats = ['property-manager', 'bank-statement'] as const
+export type CsvImportFormat = (typeof csvImportFormats)[number]
+
 export interface ImportSummary {
   imported: number
   duplicates: number
@@ -24,10 +29,17 @@ export interface ImportSummary {
 function parseUploadForm(data: unknown) {
   if (!(data instanceof FormData)) throw new Error('Expected FormData')
   const file = data.get('file')
+  const format = data.get('format')
   if (!(file instanceof File) || file.size === 0) {
     throw new Error('A CSV file is required')
   }
-  return { file }
+  if (
+    typeof format !== 'string' ||
+    !csvImportFormats.includes(format as CsvImportFormat)
+  ) {
+    throw new Error('Invalid import format')
+  }
+  return { file, format: format as CsvImportFormat }
 }
 
 export const importTransactionsCsv = createServerFn({ method: 'POST' })
@@ -45,7 +57,12 @@ export const importTransactionsCsv = createServerFn({ method: 'POST' })
     if (!property) throw new Error('No property configured yet')
 
     const categoryIdByName = new Map(categories.map((c) => [c.name, c.id]))
-    const { rows, errors } = await parseTransactionsCsv(csvText)
+
+    const parse: (text: string) => Promise<CsvParseResult> =
+      data.format === 'bank-statement'
+        ? parseBankStatementCsv
+        : parseTransactionsCsv
+    const { rows, errors } = await parse(csvText)
 
     const summary: ImportSummary = {
       imported: 0,

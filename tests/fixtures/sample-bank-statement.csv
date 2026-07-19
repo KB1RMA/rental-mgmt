@@ -1,0 +1,9 @@
+Account Name : Example Account
+Account Number : 0000000000
+Date Range : 01/01/2026-12/31/2026
+Transaction Number,Date,Description,Memo,Amount Debit,Amount Credit,Balance,Check Number
+"txn1",08/01/2026,"Remote Deposit","",,2950.00,5000.00,
+"txn2",08/09/2026,"Check","",-201.50,,4798.50,102
+"txn3",08/03/2026,"WF HOME MTG/AUTO PAY","EXAMPLE OWNER",-1200.00,,3598.50,
+"txn4",08/12/2026,"POS Purchase Non-PIN ICI*FEE","SAMPLETOWN",-9.04,,3589.46,
+"txn5",08/15/2026,"ATM Withdrawal SAMPLETOWN BANK","",-100.00,,3489.46,

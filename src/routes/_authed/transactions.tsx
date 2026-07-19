@@ -10,25 +10,12 @@ import { importTransactionsCsv } from '#/lib/transactions-import.functions'
 import type { ImportSummary } from '#/lib/transactions-import.functions'
 import { formatCents } from '#/lib/format'
 import { cn } from '#/lib/cn'
+import { retryOnce } from '#/lib/retry-once'
 
 export const Route = createFileRoute('/_authed/transactions')({
   loader: () => getTransactionsPageData(),
   component: TransactionsPage,
 })
-
-// The CSV upload is a large, cold-loaded server function bundle; a transient
-// "Failed to fetch" on the first hit is a real (if rare) possibility on any
-// network, so retry once before surfacing an error to the user.
-async function importWithRetry(formData: FormData): Promise<ImportSummary> {
-  try {
-    return await importTransactionsCsv({ data: formData })
-  } catch (err) {
-    if (err instanceof TypeError) {
-      return importTransactionsCsv({ data: formData })
-    }
-    throw err
-  }
-}
 
 function TransactionsPage() {
   const { transactions, categories } = Route.useLoaderData()
@@ -45,7 +32,9 @@ function TransactionsPage() {
     const form = event.currentTarget
     const formData = new FormData(form)
     try {
-      const result = await importWithRetry(formData)
+      const result = await retryOnce(() =>
+        importTransactionsCsv({ data: formData }),
+      )
       setSummary(result)
       form.reset()
       await router.invalidate()
@@ -57,7 +46,9 @@ function TransactionsPage() {
   }
 
   async function handleRecategorize(transactionId: string, categoryId: string) {
-    await recategorizeTransaction({ data: { transactionId, categoryId } })
+    await retryOnce(() =>
+      recategorizeTransaction({ data: { transactionId, categoryId } }),
+    )
     await router.invalidate()
   }
 
@@ -66,6 +57,20 @@ function TransactionsPage() {
       <h1 className="text-3xl font-bold">Transactions</h1>
 
       <form onSubmit={handleUpload} className="mt-4 flex items-end gap-3">
+        <div>
+          <label className="block text-sm font-medium" htmlFor="format">
+            Source
+          </label>
+          <select
+            id="format"
+            name="format"
+            defaultValue="property-manager"
+            className="mt-1 border border-neutral-300 px-2 py-1 dark:border-neutral-700"
+          >
+            <option value="property-manager">Property manager export</option>
+            <option value="bank-statement">Bank statement export</option>
+          </select>
+        </div>
         <div>
           <label className="block text-sm font-medium" htmlFor="file">
             Import CSV
