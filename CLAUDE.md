@@ -48,16 +48,14 @@ Original plan: `/Users/chris/.claude/plans/i-want-to-build-prancy-quail.md` (may
 - ✅ Phase 2: Domain schema, lease/documents
 - ✅ Phase 3: CSV import, categorization, rent ledger (+ bank-statement format and transaction splits added afterward, not in the original plan)
 - ⏳ Phase 4: Plaid sync via cron — not started
-- ⏳ Phase 5: Assessor scrape — not started, next up
+- ✅ Phase 5: Assessor data (amended — see below)
 - ⏳ Phase 6: Renewal decision dashboard — not started
 
-### Phase 5 starting point (assessor scrape)
+### Phase 5 (assessor data) — amended approach
 
-Goal: pull property tax assessment history from the Sampletown, MA assessor (Vision Government Solutions) into the `tax_assessments` table (already in schema, unused so far).
+Original plan called for server-side scraping (HTMLRewriter, R2 archive, cron). Amended: **no deployed scraping**. Instead:
 
-- Site: `gis.vgsi.com/sampletownma`. `Search.aspx` is classic ASP.NET WebForms (needs ViewState, awkward to script) — find the parcel ID (pid) for 123 Example Street manually once, in a browser.
-- Once you have the pid, `Parcel.aspx?pid=<pid>` is a plain GET — fetchable server-side without any form submission.
-- `properties.assessor_pid` column already exists to store the pid once found.
-- Plan: archive the raw HTML to R2 (for re-parsing if the parse logic needs fixing later), parse assessment/tax values with `HTMLRewriter` (native to Workers, streaming, cheap — don't reach for a DOM-parsing library), write into `tax_assessments`.
-- Add a manual-entry fallback form, since VGSI's markup isn't guaranteed stable and could break the parser.
-- 10ms CPU limit on Workers free tier: the fetch+parse should be fine (I/O wait doesn't count against CPU time), just don't do anything CPU-heavy like PDF parsing server-side.
+- `scripts/scrape-assessor.mjs` (`npm run scrape:assessor`) fetches the Sampletown assessor (Vision Government Solutions, `gis.vgsi.com/sampletownma`) parcel page locally, using `ASSESSOR_PID` from `.env` (gitignored — never hardcode the parcel id or address in committed files), and writes raw HTML + a `tax-assessments.csv` into gitignored `_docs/`.
+- The app has a `/tax-assessments` page: CSV import (upserts on the `(propertyId, fiscalYear)` unique key — re-uploading the same file is idempotent), a manual-entry/correction form, and a history table with per-row delete. See `src/lib/csv/parse-tax-assessments.ts`, `src/lib/tax-assessments.functions.ts`, `src/db/repositories/tax-assessments.ts`.
+- To get real data into production: run the scrape script locally, then upload the resulting `_docs/tax-assessments.csv` through the deployed `/tax-assessments` UI by hand. Nothing scraped ever touches git or gets written directly to the DB.
+- `rawDocumentId`/`scrapedAt` columns on `tax_assessments` are unused by this flow (raw HTML lives in local `_docs/`, not R2) — left null.
