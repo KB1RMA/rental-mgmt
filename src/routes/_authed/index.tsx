@@ -22,6 +22,12 @@ function Dashboard() {
         >
           Transactions
         </Link>
+        <Link
+          to="/tax-assessments"
+          className="text-blue-600 underline dark:text-blue-400"
+        >
+          Tax assessments
+        </Link>
       </div>
     </div>
   )
