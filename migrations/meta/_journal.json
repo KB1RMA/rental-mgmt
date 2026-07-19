@@ -43,6 +43,13 @@
       "when": 1784465230557,
       "tag": "0005_fine_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1784488859819,
+      "tag": "0006_youthful_stick",
+      "breakpoints": true
     }
   ]
 }

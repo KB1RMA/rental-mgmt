@@ -340,6 +340,23 @@ export const comparableRents = sqliteTable('comparable_rents', {
   notedAt: text('noted_at').notNull(),
 })
 
+export const renewalAssumptions = sqliteTable('renewal_assumptions', {
+  id: id(),
+  propertyId: text('property_id')
+    .notNull()
+    .unique()
+    .references(() => properties.id, { onDelete: 'cascade' }),
+  proposedRentCents: integer('proposed_rent_cents'),
+  monthlyPrincipalCents: integer('monthly_principal_cents')
+    .notNull()
+    .default(0),
+  monthlyExpenseOverrideCents: integer('monthly_expense_override_cents'),
+  notes: text('notes'),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
 export const propertiesRelations = relations(properties, ({ many }) => ({
   units: many(units),
   documents: many(documents),
