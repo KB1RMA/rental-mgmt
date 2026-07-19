@@ -14,7 +14,6 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: npm ci
-      - run: npm run cf-typegen
       - name: Write ephemeral .env
         run: |
           echo "BETTER_AUTH_URL=http://localhost:3000" >> .env

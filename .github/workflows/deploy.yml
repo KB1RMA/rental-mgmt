@@ -18,7 +18,6 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: npm ci
-      - run: npm run cf-typegen
       - name: Apply D1 migrations
         run: npm run db:migrate:remote
         env:
