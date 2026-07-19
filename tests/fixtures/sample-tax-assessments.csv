@@ -1,0 +1,4 @@
+fiscal_year,land,building,total,tax_rate,annual_tax,source_url
+2025,100000,300000,,9.50,,https://example.com/parcel
+2024,95000,280000,,9.80,,https://example.com/parcel
+2023,90000,260000,345000,10.20,,https://example.com/parcel
