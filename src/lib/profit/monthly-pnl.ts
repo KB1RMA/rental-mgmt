@@ -127,8 +127,7 @@ export function computeMonthlyPnl(input: {
   endPeriod: string
   monthlyPrincipalCents: number
 }): PnlSummary {
-  const { transactions, startPeriod, endPeriod, monthlyPrincipalCents } =
-    input
+  const { transactions, startPeriod, endPeriod, monthlyPrincipalCents } = input
   const periods = enumerateMonths(startPeriod, endPeriod)
   const { items, uncategorizedByPeriod } = expandLineItems(transactions)
 

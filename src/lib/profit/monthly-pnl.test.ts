@@ -54,11 +54,7 @@ describe('computeMonthlyPnl', () => {
       monthlyPrincipalCents: 0,
     })
 
-    expect(rows.map((r) => r.period)).toEqual([
-      '2025-11',
-      '2025-12',
-      '2026-01',
-    ])
+    expect(rows.map((r) => r.period)).toEqual(['2025-11', '2025-12', '2026-01'])
     expect(rows[0]).toMatchObject({
       incomeCents: 295000,
       expenseCents: 50000,
@@ -237,9 +233,7 @@ describe('averageMonthlyExpenseCents', () => {
     return computeMonthlyPnl({
       transactions: expenses.flatMap((cents, i) => {
         const month = String(i + 1).padStart(2, '0')
-        return cents > 0
-          ? [txn(`2025-${month}-10`, cents, repairs)]
-          : []
+        return cents > 0 ? [txn(`2025-${month}-10`, cents, repairs)] : []
       }),
       startPeriod: '2025-01',
       endPeriod: `2025-${String(expenses.length).padStart(2, '0')}`,

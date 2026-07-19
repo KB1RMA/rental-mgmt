@@ -28,6 +28,12 @@ function Dashboard() {
         >
           Tax assessments
         </Link>
+        <Link
+          to="/renewal"
+          className="text-blue-600 underline dark:text-blue-400"
+        >
+          Renewal
+        </Link>
       </div>
     </div>
   )

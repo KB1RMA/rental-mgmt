@@ -13,6 +13,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedLeaseRouteImport } from './routes/_authed/lease'
+import { Route as AuthedRenewalRouteImport } from './routes/_authed/renewal'
 import { Route as AuthedTaxAssessmentsRouteImport } from './routes/_authed/tax-assessments'
 import { Route as AuthedTransactionsRouteImport } from './routes/_authed/transactions'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -35,6 +36,11 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
 const AuthedLeaseRoute = AuthedLeaseRouteImport.update({
   id: '/lease',
   path: '/lease',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedRenewalRoute = AuthedRenewalRouteImport.update({
+  id: '/renewal',
+  path: '/renewal',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedTaxAssessmentsRoute = AuthedTaxAssessmentsRouteImport.update({
@@ -62,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
   '/lease': typeof AuthedLeaseRoute
+  '/renewal': typeof AuthedRenewalRoute
   '/tax-assessments': typeof AuthedTaxAssessmentsRoute
   '/transactions': typeof AuthedTransactionsRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/lease': typeof AuthedLeaseRoute
+  '/renewal': typeof AuthedRenewalRoute
   '/tax-assessments': typeof AuthedTaxAssessmentsRoute
   '/transactions': typeof AuthedTransactionsRoute
   '/': typeof AuthedIndexRoute
@@ -81,6 +89,7 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authed/lease': typeof AuthedLeaseRoute
+  '/_authed/renewal': typeof AuthedRenewalRoute
   '/_authed/tax-assessments': typeof AuthedTaxAssessmentsRoute
   '/_authed/transactions': typeof AuthedTransactionsRoute
   '/_authed/': typeof AuthedIndexRoute
@@ -93,6 +102,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/lease'
+    | '/renewal'
     | '/tax-assessments'
     | '/transactions'
     | '/api/auth/$'
@@ -101,6 +111,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/lease'
+    | '/renewal'
     | '/tax-assessments'
     | '/transactions'
     | '/'
@@ -111,6 +122,7 @@ export interface FileRouteTypes {
     | '/_authed'
     | '/login'
     | '/_authed/lease'
+    | '/_authed/renewal'
     | '/_authed/tax-assessments'
     | '/_authed/transactions'
     | '/_authed/'
@@ -155,6 +167,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedLeaseRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/renewal': {
+      id: '/_authed/renewal'
+      path: '/renewal'
+      fullPath: '/renewal'
+      preLoaderRoute: typeof AuthedRenewalRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/tax-assessments': {
       id: '/_authed/tax-assessments'
       path: '/tax-assessments'
@@ -188,6 +207,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedLeaseRoute: typeof AuthedLeaseRoute
+  AuthedRenewalRoute: typeof AuthedRenewalRoute
   AuthedTaxAssessmentsRoute: typeof AuthedTaxAssessmentsRoute
   AuthedTransactionsRoute: typeof AuthedTransactionsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
@@ -195,6 +215,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedLeaseRoute: AuthedLeaseRoute,
+  AuthedRenewalRoute: AuthedRenewalRoute,
   AuthedTaxAssessmentsRoute: AuthedTaxAssessmentsRoute,
   AuthedTransactionsRoute: AuthedTransactionsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
