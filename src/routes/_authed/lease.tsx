@@ -8,6 +8,7 @@ import { documentKinds } from '#/db/schema'
 import { formatCents } from '#/lib/format'
 import { syncAndGetRentLedger } from '#/lib/rent-ledger.functions'
 import { cn } from '#/lib/cn'
+import { fieldClass } from '#/lib/form-styles'
 
 export const Route = createFileRoute('/_authed/lease')({
   loader: async () => {
@@ -177,7 +178,10 @@ function LeasePage() {
             id="kind"
             name="kind"
             defaultValue="lease"
-            className="mt-1 border border-neutral-300 px-2 py-1 dark:border-neutral-700"
+            className={cn(
+              'mt-1 border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+              fieldClass,
+            )}
           >
             {documentKinds.map((kind) => (
               <option key={kind} value={kind}>

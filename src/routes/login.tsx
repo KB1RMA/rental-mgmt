@@ -7,6 +7,8 @@ import { z } from 'zod'
 import { authClient } from '#/lib/auth-client'
 import { loginSchema } from '#/lib/schemas/auth'
 import type { LoginInput } from '#/lib/schemas/auth'
+import { cn } from '#/lib/cn'
+import { fieldClass } from '#/lib/form-styles'
 
 const loginSearchSchema = z.object({
   redirect: z.string().optional(),
@@ -48,11 +50,16 @@ function LoginPage() {
           <input
             id="email"
             type="email"
-            className="mt-1 w-full border border-neutral-300 px-3 py-2 dark:border-neutral-700"
+            className={cn(
+              'mt-1 w-full border border-neutral-300 px-3 py-2 dark:border-neutral-700',
+              fieldClass,
+            )}
             {...register('email')}
           />
           {errors.email && (
-            <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+              {errors.email.message}
+            </p>
           )}
         </div>
         <div>
@@ -62,16 +69,21 @@ function LoginPage() {
           <input
             id="password"
             type="password"
-            className="mt-1 w-full border border-neutral-300 px-3 py-2 dark:border-neutral-700"
+            className={cn(
+              'mt-1 w-full border border-neutral-300 px-3 py-2 dark:border-neutral-700',
+              fieldClass,
+            )}
             {...register('password')}
           />
           {errors.password && (
-            <p className="mt-1 text-sm text-red-600">
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
               {errors.password.message}
             </p>
           )}
         </div>
-        {formError && <p className="text-sm text-red-600">{formError}</p>}
+        {formError && (
+          <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
+        )}
         <button
           type="submit"
           disabled={isSubmitting}

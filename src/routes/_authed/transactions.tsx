@@ -12,6 +12,7 @@ import { saveTransactionSplits } from '#/lib/transaction-splits.functions'
 import { formatCents } from '#/lib/format'
 import { cn } from '#/lib/cn'
 import { retryOnce } from '#/lib/retry-once'
+import { fieldClass } from '#/lib/form-styles'
 
 export const Route = createFileRoute('/_authed/transactions')({
   loader: () => getTransactionsPageData(),
@@ -80,7 +81,10 @@ function TransactionsPage() {
             id="format"
             name="format"
             defaultValue="property-manager"
-            className="mt-1 border border-neutral-300 px-2 py-1 dark:border-neutral-700"
+            className={cn(
+              'mt-1 border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+              fieldClass,
+            )}
           >
             <option value="property-manager">Property manager export</option>
             <option value="bank-statement">Bank statement export</option>
@@ -292,6 +296,7 @@ function TransactionRow({
                   transaction.categoryId
                     ? 'border-neutral-300 dark:border-neutral-700'
                     : 'border-amber-400 dark:border-amber-600',
+                  fieldClass,
                 )}
               >
                 <option value="" disabled>
@@ -330,7 +335,10 @@ function TransactionRow({
                     onChange={(event) =>
                       updateLine(index, { categoryId: event.target.value })
                     }
-                    className="border border-neutral-300 px-2 py-1 dark:border-neutral-700"
+                    className={cn(
+                      'border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+                      fieldClass,
+                    )}
                   >
                     <option value="" disabled>
                       Choose category
@@ -348,12 +356,15 @@ function TransactionRow({
                     onChange={(event) =>
                       updateLine(index, { amount: event.target.value })
                     }
-                    className="w-28 border border-neutral-300 px-2 py-1 dark:border-neutral-700"
+                    className={cn(
+                      'w-28 border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+                      fieldClass,
+                    )}
                   />
                   <button
                     type="button"
                     onClick={() => removeLine(index)}
-                    className="text-xs text-neutral-500 hover:text-red-600"
+                    className="text-xs text-neutral-500 hover:text-red-600 dark:text-neutral-400 dark:hover:text-red-400"
                   >
                     Remove
                   </button>
