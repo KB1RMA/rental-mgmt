@@ -43,8 +43,9 @@ function CategoriesPage() {
         createCategoryFn({
           data: {
             name: String(formData.get('name') ?? ''),
-            type: String(formData.get('type') ?? 'expense') as
-              (typeof categoryTypes)[number],
+            type: String(
+              formData.get('type') ?? 'expense',
+            ) as (typeof categoryTypes)[number],
             scheduleELine: String(formData.get('scheduleELine') ?? '') as
               (typeof scheduleELines)[number] | '',
           },

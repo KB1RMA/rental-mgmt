@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
   FileText,
@@ -15,6 +15,28 @@ import { cn } from '#/lib/cn'
 
 const STORAGE_KEY = 'sidebar-collapsed'
 
+let collapsedListeners: Array<() => void> = []
+
+function subscribeCollapsed(callback: () => void) {
+  collapsedListeners.push(callback)
+  return () => {
+    collapsedListeners = collapsedListeners.filter((l) => l !== callback)
+  }
+}
+
+function getCollapsedSnapshot() {
+  return localStorage.getItem(STORAGE_KEY) === 'true'
+}
+
+function getCollapsedServerSnapshot() {
+  return false
+}
+
+function setCollapsed(value: boolean) {
+  localStorage.setItem(STORAGE_KEY, String(value))
+  collapsedListeners.forEach((l) => l())
+}
+
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/lease', label: 'Lease', icon: FileText },
@@ -29,19 +51,15 @@ export default function SidebarNav({
 }: {
   propertyLabel: string | null
 }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const collapsed = useSyncExternalStore(
+    subscribeCollapsed,
+    getCollapsedSnapshot,
+    getCollapsedServerSnapshot,
+  )
   const pathname = useRouterState({ select: (s) => s.location.pathname })
 
-  useEffect(() => {
-    if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true)
-  }, [])
-
   function toggle() {
-    setCollapsed((prev) => {
-      const next = !prev
-      localStorage.setItem(STORAGE_KEY, String(next))
-      return next
-    })
+    setCollapsed(!collapsed)
   }
 
   return (
