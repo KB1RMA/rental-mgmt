@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 
 import { db } from '#/db'
 import { transactionSplits, transactions } from '#/db/schema'
@@ -24,19 +24,6 @@ export function listTransactionsWithCategory() {
       splits: { with: { category: true } },
     },
     orderBy: desc(transactions.postedDate),
-  })
-}
-
-export function listTransactionsByCategory(
-  propertyId: string,
-  categoryId: string,
-) {
-  return db.query.transactions.findMany({
-    where: and(
-      eq(transactions.propertyId, propertyId),
-      eq(transactions.categoryId, categoryId),
-    ),
-    orderBy: transactions.postedDate,
   })
 }
 

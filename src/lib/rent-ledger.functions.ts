@@ -2,11 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { authMiddleware } from '#/lib/auth-middleware'
-import {
-  generateChargePeriods,
-  periodForPaymentDate,
-  computeChargeStatus,
-} from '#/lib/rent/ledger'
+import { generateChargePeriods, computeChargeStatus } from '#/lib/rent/ledger'
 import { getActiveLease } from '#/db/repositories/leases'
 import {
   createRentCharge,
@@ -15,7 +11,6 @@ import {
   getRentChargeForPeriod,
   listLinkedTransactionRefs,
   listRentChargesForLease,
-  rentPaymentExistsForTransaction,
   updateRentChargeAmount as setRentChargeAmount,
   updateRentChargeStatus,
 } from '#/db/repositories/rent'
@@ -23,9 +18,82 @@ import { getCategoryByName } from '#/db/repositories/categories'
 import {
   getTransactionById,
   getTransactionSplitById,
-  listTransactionsByCategory,
   listTransactionsForProperty,
+  updateTransactionCategory,
 } from '#/db/repositories/transactions'
+
+interface PaymentCandidate {
+  transactionId: string
+  splitId: string | null
+  postedDate: string
+  amountCents: number
+  description: string
+  categoryId: string | null
+  categoryName: string | null
+}
+
+/**
+ * The property's transactions, expanded into payable line items and stripped
+ * of anything already linked to a rent payment — the pool the manual reconcile
+ * picker offers so a payment is always tied to a real bank transaction.
+ *
+ * A split transaction's own top-level category is stale the moment it's
+ * split (splitting never clears it — see `transaction-splits.functions.ts`),
+ * so once a transaction has splits only its split lines are considered;
+ * the whole transaction never appears as a candidate. This mirrors how
+ * `expandLineItems` in `lib/profit/monthly-pnl.ts` already treats splits
+ * as authoritative — a transaction is either one line item or N split line
+ * items, never both.
+ *
+ * Anything already categorized as a non-income type (an expense, a security
+ * deposit `transfer`, etc.) is excluded: it can never be the payment for a
+ * rent charge, so it must not appear in the picker where a mistaken pick would
+ * silently relabel it as income. Uncategorized whole transactions are kept —
+ * they're the reconcile-uncategorized case, and get categorized on link.
+ */
+async function getPaymentCandidatesForProperty(
+  propertyId: string,
+): Promise<PaymentCandidate[]> {
+  const [transactionList, linked] = await Promise.all([
+    listTransactionsForProperty(propertyId),
+    listLinkedTransactionRefs(),
+  ])
+
+  const candidates: PaymentCandidate[] = []
+
+  for (const transaction of transactionList) {
+    if (transaction.splits.length > 0) {
+      for (const split of transaction.splits) {
+        if (linked.splitIds.has(split.id)) continue
+        if (split.category.type !== 'income') continue
+        candidates.push({
+          transactionId: transaction.id,
+          splitId: split.id,
+          postedDate: transaction.postedDate,
+          amountCents: split.amountCents,
+          description: transaction.merchant ?? transaction.description,
+          categoryId: split.categoryId,
+          categoryName: split.category.name,
+        })
+      }
+    } else {
+      if (linked.transactionIds.has(transaction.id)) continue
+      if (transaction.category && transaction.category.type !== 'income')
+        continue
+      candidates.push({
+        transactionId: transaction.id,
+        splitId: null,
+        postedDate: transaction.postedDate,
+        amountCents: transaction.amountCents,
+        description: transaction.merchant ?? transaction.description,
+        categoryId: transaction.categoryId,
+        categoryName: transaction.category?.name ?? null,
+      })
+    }
+  }
+
+  return candidates
+}
 
 export const syncAndGetRentLedger = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
@@ -50,30 +118,6 @@ export const syncAndGetRentLedger = createServerFn({ method: 'POST' })
           dueDate,
           amountCents: lease.rentCents,
           status: 'due',
-        })
-      }
-    }
-
-    const rentIncomeCategory = await getCategoryByName('Rent Income')
-    if (rentIncomeCategory) {
-      const propertyId = lease.unit.property.id
-      const rentTransactions = await listTransactionsByCategory(
-        propertyId,
-        rentIncomeCategory.id,
-      )
-
-      for (const transaction of rentTransactions) {
-        if (await rentPaymentExistsForTransaction(transaction.id)) continue
-
-        const period = periodForPaymentDate(transaction.postedDate)
-        const charge = await getRentChargeForPeriod(lease.id, period)
-        if (!charge) continue
-
-        await createRentPayment({
-          rentChargeId: charge.id,
-          transactionId: transaction.id,
-          paidDate: transaction.postedDate,
-          amountCents: transaction.amountCents,
         })
       }
     }
@@ -126,47 +170,7 @@ export const listRentPaymentCandidates = createServerFn({ method: 'GET' })
     const lease = await getActiveLease()
     if (!lease) return []
 
-    const [transactionList, linked] = await Promise.all([
-      listTransactionsForProperty(lease.unit.property.id),
-      listLinkedTransactionRefs(),
-    ])
-
-    const candidates: Array<{
-      transactionId: string
-      splitId: string | null
-      postedDate: string
-      amountCents: number
-      description: string
-      categoryName: string | null
-    }> = []
-
-    for (const transaction of transactionList) {
-      if (transaction.splits.length > 0) {
-        for (const split of transaction.splits) {
-          if (linked.splitIds.has(split.id)) continue
-          candidates.push({
-            transactionId: transaction.id,
-            splitId: split.id,
-            postedDate: transaction.postedDate,
-            amountCents: split.amountCents,
-            description: transaction.merchant ?? transaction.description,
-            categoryName: split.category.name,
-          })
-        }
-      } else {
-        if (linked.transactionIds.has(transaction.id)) continue
-        candidates.push({
-          transactionId: transaction.id,
-          splitId: null,
-          postedDate: transaction.postedDate,
-          amountCents: transaction.amountCents,
-          description: transaction.merchant ?? transaction.description,
-          categoryName: transaction.category?.name ?? null,
-        })
-      }
-    }
-
-    return candidates
+    return getPaymentCandidatesForProperty(lease.unit.property.id)
   })
 
 /**
@@ -174,6 +178,14 @@ export const listRentPaymentCandidates = createServerFn({ method: 'GET' })
  * transaction) picked from `listRentPaymentCandidates` — amount and date are
  * always derived server-side from the transaction, never taken from the
  * client, so the ledger can't drift from the bank record.
+ *
+ * Reports (monthly P&L, Schedule E) classify income/expense purely from
+ * `categories.type` on the transaction, not from rent_payments — so an
+ * uncategorized transaction linked here would show as "paid" in the ledger
+ * but invisible in every report. A split's category was already chosen
+ * deliberately when the split was created, so it's left alone; a whole,
+ * still-uncategorized transaction is categorized as Rent Income so the two
+ * views of the same payment stay consistent.
  */
 export const addRentPaymentFromTransaction = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
@@ -202,6 +214,12 @@ export const addRentPaymentFromTransaction = createServerFn({ method: 'POST' })
         method: 'matched',
       })
     } else {
+      if (transaction.categoryId == null) {
+        const rentIncomeCategory = await getCategoryByName('Rent Income')
+        if (rentIncomeCategory) {
+          await updateTransactionCategory(transaction.id, rentIncomeCategory.id)
+        }
+      }
       await createRentPayment({
         rentChargeId: data.rentChargeId,
         transactionId: data.transactionId,
