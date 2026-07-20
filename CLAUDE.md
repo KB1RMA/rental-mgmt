@@ -1,6 +1,6 @@
 # rental-mgmt
 
-Personal rental-property bookkeeping app for Chris's rental at 123 Example Street, Sampletown MA. TanStack Start (React) on Cloudflare Workers, D1, R2, Better Auth. Deployed at https://rental-mgmt.logbook.am via GitHub Actions CI/CD.
+Personal rental-property bookkeeping app for a rental property Chris owns. TanStack Start (React) on Cloudflare Workers, D1, R2, Better Auth. Deployed at https://rental-mgmt.logbook.am via GitHub Actions CI/CD.
 
 ## Critical rules
 
@@ -55,7 +55,7 @@ Original plan: `/Users/chris/.claude/plans/i-want-to-build-prancy-quail.md` (may
 
 Original plan called for server-side scraping (HTMLRewriter, R2 archive, cron). Amended: **no deployed scraping**. Instead:
 
-- `scripts/scrape-assessor.mjs` (`npm run scrape:assessor`) fetches the Sampletown assessor (Vision Government Solutions, `gis.vgsi.com/sampletownma`) parcel page locally, using `ASSESSOR_PID` from `.env` (gitignored — never hardcode the parcel id or address in committed files), and writes raw HTML + a `tax-assessments.csv` into gitignored `_docs/`.
+- `scripts/scrape-assessor.mjs` (`npm run scrape:assessor`) fetches the assessor (Vision Government Solutions, `gis.vgsi.com/<town>`) parcel page locally, using `ASSESSOR_PID` and `ASSESSOR_TOWN` from `.env` (gitignored — never hardcode the parcel id, town, or address in committed files), and writes raw HTML + a `tax-assessments.csv` into gitignored `_docs/`.
 - The app has a `/tax-assessments` page: CSV import (upserts on the `(propertyId, fiscalYear)` unique key — re-uploading the same file is idempotent), a manual-entry/correction form, and a history table with per-row delete. See `src/lib/csv/parse-tax-assessments.ts`, `src/lib/tax-assessments.functions.ts`, `src/db/repositories/tax-assessments.ts`.
 - To get real data into production: run the scrape script locally, then upload the resulting `_docs/tax-assessments.csv` through the deployed `/tax-assessments` UI by hand. Nothing scraped ever touches git or gets written directly to the DB.
 - `rawDocumentId`/`scrapedAt` columns on `tax_assessments` are unused by this flow (raw HTML lives in local `_docs/`, not R2) — left null.

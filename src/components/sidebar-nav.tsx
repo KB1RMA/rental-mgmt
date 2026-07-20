@@ -24,7 +24,11 @@ const navItems = [
   { to: '/renewal', label: 'Renewal', icon: TrendingUp },
 ] as const
 
-export default function SidebarNav() {
+export default function SidebarNav({
+  propertyLabel,
+}: {
+  propertyLabel: string | null
+}) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
 
@@ -53,9 +57,9 @@ export default function SidebarNav() {
           collapsed ? 'justify-center' : 'justify-between',
         )}
       >
-        {!collapsed && (
+        {!collapsed && propertyLabel && (
           <span className="truncate text-sm font-semibold">
-            123 Example Street
+            {propertyLabel}
           </span>
         )}
         <button

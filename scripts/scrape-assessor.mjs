@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Fetches the Sampletown (Vision Government Solutions) assessor parcel page
-// for the property's parcel id, archives the raw HTML, and writes a
+// Fetches a Vision Government Solutions assessor parcel page for the
+// property's parcel id, archives the raw HTML, and writes a
 // tax-assessments CSV — both into the gitignored _docs/ directory. Nothing
 // here touches production; the CSV is meant to be uploaded through the app's
 // /tax-assessments import UI by hand.
@@ -17,20 +17,26 @@ if (!PID) {
     'ASSESSOR_PID is not set — add it to .env and run with --env-file=.env',
   )
 }
-const PARCEL_URL = `https://gis.vgsi.com/sampletownma/Parcel.aspx?pid=${PID}`
+const TOWN = process.env.ASSESSOR_TOWN
+if (!TOWN) {
+  throw new Error(
+    'ASSESSOR_TOWN is not set — add it to .env and run with --env-file=.env',
+  )
+}
+const PARCEL_URL = `https://gis.vgsi.com/${TOWN}/Parcel.aspx?pid=${PID}`
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DOCS_DIR = path.join(__dirname, '..', '_docs')
 const OUT_HTML = path.join(DOCS_DIR, `assessor-parcel-${PID}.html`)
 const OUT_CSV = path.join(DOCS_DIR, 'tax-assessments.csv')
 
-// Sampletown's published single/residential tax rate ($ per $1,000 of assessed
-// value), by fiscal year. VGSI's "Valuation Year" matches the fiscal year
-// directly (no offset) — confirmed by cross-checking the FY2026 current
-// assessment against the FY2026 rate set by City Council in Dec 2025.
-// Source: City of Sampletown Finance Dept "FY2018-FY2025 Levy Limit & Annual
-// Tax Rate" table, and the FY2026 rate reported by localnews.example.com after
-// the Dec 5, 2025 council vote.
+// This property's town's published single/residential tax rate ($ per $1,000
+// of assessed value), by fiscal year. VGSI's "Valuation Year" matches the
+// fiscal year directly (no offset) — confirmed by cross-checking the FY2026
+// current assessment against the FY2026 rate set by the town's governing
+// body in Dec 2025. Source: the town Finance Dept's "FY2018-FY2025 Levy
+// Limit & Annual Tax Rate" table, and the FY2026 rate reported by the local
+// paper after the Dec 5, 2025 council vote.
 const RATE_BY_FISCAL_YEAR = {
   2012: 12.8,
   2013: 13.32,
