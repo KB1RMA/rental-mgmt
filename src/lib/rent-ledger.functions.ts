@@ -25,6 +25,7 @@ import {
   getTransactionSplitById,
   listTransactionsByCategory,
   listTransactionsForProperty,
+  updateTransactionCategory,
 } from '#/db/repositories/transactions'
 
 export const syncAndGetRentLedger = createServerFn({ method: 'POST' })
@@ -174,6 +175,14 @@ export const listRentPaymentCandidates = createServerFn({ method: 'GET' })
  * transaction) picked from `listRentPaymentCandidates` — amount and date are
  * always derived server-side from the transaction, never taken from the
  * client, so the ledger can't drift from the bank record.
+ *
+ * Reports (monthly P&L, Schedule E) classify income/expense purely from
+ * `categories.type` on the transaction, not from rent_payments — so an
+ * uncategorized transaction linked here would show as "paid" in the ledger
+ * but invisible in every report. A split's category was already chosen
+ * deliberately when the split was created, so it's left alone; a whole,
+ * still-uncategorized transaction is categorized as Rent Income so the two
+ * views of the same payment stay consistent.
  */
 export const addRentPaymentFromTransaction = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
@@ -202,6 +211,12 @@ export const addRentPaymentFromTransaction = createServerFn({ method: 'POST' })
         method: 'matched',
       })
     } else {
+      if (transaction.categoryId == null) {
+        const rentIncomeCategory = await getCategoryByName('Rent Income')
+        if (rentIncomeCategory) {
+          await updateTransactionCategory(transaction.id, rentIncomeCategory.id)
+        }
+      }
       await createRentPayment({
         rentChargeId: data.rentChargeId,
         transactionId: data.transactionId,
