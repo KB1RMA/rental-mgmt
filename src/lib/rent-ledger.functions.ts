@@ -13,13 +13,19 @@ import {
   createRentPayment,
   deleteRentPayment as deleteRentPaymentRow,
   getRentChargeForPeriod,
+  listLinkedTransactionRefs,
   listRentChargesForLease,
   rentPaymentExistsForTransaction,
   updateRentChargeAmount as setRentChargeAmount,
   updateRentChargeStatus,
 } from '#/db/repositories/rent'
 import { getCategoryByName } from '#/db/repositories/categories'
-import { listTransactionsByCategory } from '#/db/repositories/transactions'
+import {
+  getTransactionById,
+  getTransactionSplitById,
+  listTransactionsByCategory,
+  listTransactionsForProperty,
+} from '#/db/repositories/transactions'
 
 export const syncAndGetRentLedger = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
@@ -107,26 +113,103 @@ export const updateRentChargeAmount = createServerFn({ method: 'POST' })
   })
 
 /**
- * Records a payment against a charge without requiring a matching bank
- * transaction — for cases like a lump-sum move-in payment that was split
- * across categories and so isn't visible to the auto-sync's category match.
+ * Transactions/splits for the property not yet linked to any rent payment —
+ * the pool of candidates the reconcile UI picks from, so a payment is always
+ * tied to a real bank transaction rather than a typed-in amount. A split
+ * transaction (e.g. a move-in payment covering rent + deposit) offers its
+ * individual split lines instead of the whole transaction, since only one
+ * line is the actual rent portion.
  */
-export const addManualRentPayment = createServerFn({ method: 'POST' })
+export const listRentPaymentCandidates = createServerFn({ method: 'GET' })
+  .middleware([authMiddleware])
+  .handler(async () => {
+    const lease = await getActiveLease()
+    if (!lease) return []
+
+    const [transactionList, linked] = await Promise.all([
+      listTransactionsForProperty(lease.unit.property.id),
+      listLinkedTransactionRefs(),
+    ])
+
+    const candidates: Array<{
+      transactionId: string
+      splitId: string | null
+      postedDate: string
+      amountCents: number
+      description: string
+      categoryName: string | null
+    }> = []
+
+    for (const transaction of transactionList) {
+      if (transaction.splits.length > 0) {
+        for (const split of transaction.splits) {
+          if (linked.splitIds.has(split.id)) continue
+          candidates.push({
+            transactionId: transaction.id,
+            splitId: split.id,
+            postedDate: transaction.postedDate,
+            amountCents: split.amountCents,
+            description: transaction.merchant ?? transaction.description,
+            categoryName: split.category.name,
+          })
+        }
+      } else {
+        if (linked.transactionIds.has(transaction.id)) continue
+        candidates.push({
+          transactionId: transaction.id,
+          splitId: null,
+          postedDate: transaction.postedDate,
+          amountCents: transaction.amountCents,
+          description: transaction.merchant ?? transaction.description,
+          categoryName: transaction.category?.name ?? null,
+        })
+      }
+    }
+
+    return candidates
+  })
+
+/**
+ * Links a rent charge to a real transaction (or one split line of a split
+ * transaction) picked from `listRentPaymentCandidates` — amount and date are
+ * always derived server-side from the transaction, never taken from the
+ * client, so the ledger can't drift from the bank record.
+ */
+export const addRentPaymentFromTransaction = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator(
     z.object({
       rentChargeId: z.string(),
-      paidDate: z.string(),
-      amountCents: z.number().int(),
+      transactionId: z.string(),
+      splitId: z.string().nullable(),
     }),
   )
   .handler(async ({ data }) => {
-    await createRentPayment({
-      rentChargeId: data.rentChargeId,
-      paidDate: data.paidDate,
-      amountCents: data.amountCents,
-      method: 'manual',
-    })
+    const transaction = await getTransactionById(data.transactionId)
+    if (!transaction) throw new Error('Transaction not found')
+
+    if (data.splitId) {
+      const split = await getTransactionSplitById(data.splitId)
+      if (!split || split.transactionId !== data.transactionId) {
+        throw new Error('Transaction split not found')
+      }
+      await createRentPayment({
+        rentChargeId: data.rentChargeId,
+        transactionId: data.transactionId,
+        transactionSplitId: data.splitId,
+        paidDate: transaction.postedDate,
+        amountCents: split.amountCents,
+        method: 'matched',
+      })
+    } else {
+      await createRentPayment({
+        rentChargeId: data.rentChargeId,
+        transactionId: data.transactionId,
+        paidDate: transaction.postedDate,
+        amountCents: transaction.amountCents,
+        method: 'matched',
+      })
+    }
   })
 
 export const deleteRentPayment = createServerFn({ method: 'POST' })

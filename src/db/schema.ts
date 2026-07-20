@@ -304,6 +304,10 @@ export const rentPayments = sqliteTable('rent_payments', {
   transactionId: text('transaction_id').references(() => transactions.id, {
     onDelete: 'set null',
   }),
+  transactionSplitId: text('transaction_split_id').references(
+    () => transactionSplits.id,
+    { onDelete: 'set null' },
+  ),
   paidDate: text('paid_date').notNull(),
   amountCents: integer('amount_cents').notNull(),
   method: text('method'),
@@ -471,5 +475,9 @@ export const rentPaymentsRelations = relations(rentPayments, ({ one }) => ({
   transaction: one(transactions, {
     fields: [rentPayments.transactionId],
     references: [transactions.id],
+  }),
+  transactionSplit: one(transactionSplits, {
+    fields: [rentPayments.transactionSplitId],
+    references: [transactionSplits.id],
   }),
 }))

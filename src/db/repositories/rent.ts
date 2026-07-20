@@ -63,3 +63,17 @@ export async function rentPaymentExistsForTransaction(transactionId: string) {
   })
   return existing != null
 }
+
+export async function listLinkedTransactionRefs() {
+  const rows = await db.query.rentPayments.findMany({
+    columns: { transactionId: true, transactionSplitId: true },
+  })
+  return {
+    transactionIds: new Set(
+      rows.map((row) => row.transactionId).filter((id) => id != null),
+    ),
+    splitIds: new Set(
+      rows.map((row) => row.transactionSplitId).filter((id) => id != null),
+    ),
+  }
+}

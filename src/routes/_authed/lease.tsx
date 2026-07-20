@@ -7,8 +7,9 @@ import { uploadDocument } from '#/lib/documents.functions'
 import { documentKinds } from '#/db/schema'
 import { formatCents } from '#/lib/format'
 import {
-  addManualRentPayment,
+  addRentPaymentFromTransaction,
   deleteRentPayment,
+  listRentPaymentCandidates,
   syncAndGetRentLedger,
   updateRentChargeAmount,
 } from '#/lib/rent-ledger.functions'
@@ -17,17 +18,25 @@ import { fieldClass } from '#/lib/form-styles'
 
 export const Route = createFileRoute('/_authed/lease')({
   loader: async () => {
-    const [lease, rentLedger] = await Promise.all([
+    const [lease, rentLedger, paymentCandidates] = await Promise.all([
       getActiveLeaseData(),
       syncAndGetRentLedger(),
+      listRentPaymentCandidates(),
     ])
-    return { lease, rentLedger }
+    return { lease, rentLedger, paymentCandidates }
   },
   component: LeasePage,
 })
 
 type RentLedger = NonNullable<Awaited<ReturnType<typeof syncAndGetRentLedger>>>
 type RentCharge = RentLedger[number]
+type PaymentCandidate = Awaited<
+  ReturnType<typeof listRentPaymentCandidates>
+>[number]
+
+function candidateKey(candidate: PaymentCandidate) {
+  return `${candidate.transactionId}:${candidate.splitId ?? ''}`
+}
 
 const statusStyles: Record<string, string> = {
   paid: 'text-green-700 dark:text-green-400',
@@ -43,7 +52,7 @@ function renewalNoticeDeadline(endDate: string, noticeDays: number) {
 }
 
 function LeasePage() {
-  const { lease, rentLedger } = Route.useLoaderData()
+  const { lease, rentLedger, paymentCandidates } = Route.useLoaderData()
   const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -133,6 +142,7 @@ function LeasePage() {
             <RentLedgerRow
               key={charge.id}
               charge={charge}
+              candidates={paymentCandidates}
               onInvalidate={() => router.invalidate()}
             />
           ))}
@@ -198,15 +208,16 @@ function LeasePage() {
 
 function RentLedgerRow({
   charge,
+  candidates,
   onInvalidate,
 }: {
   charge: RentCharge
+  candidates: PaymentCandidate[]
   onInvalidate: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [amount, setAmount] = useState((charge.amountCents / 100).toFixed(2))
-  const [paymentDate, setPaymentDate] = useState(charge.dueDate)
-  const [paymentAmount, setPaymentAmount] = useState('')
+  const [selectedKey, setSelectedKey] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -235,20 +246,21 @@ function RentLedgerRow({
 
   async function handleAddPayment() {
     setError(null)
-    if (!paymentAmount || Number(paymentAmount) === 0) {
-      setError('Enter a payment amount')
+    const candidate = candidates.find((c) => candidateKey(c) === selectedKey)
+    if (!candidate) {
+      setError('Select a transaction')
       return
     }
     setSaving(true)
     try {
-      await addManualRentPayment({
+      await addRentPaymentFromTransaction({
         data: {
           rentChargeId: charge.id,
-          paidDate: paymentDate,
-          amountCents: Math.round(Number(paymentAmount) * 100),
+          transactionId: candidate.transactionId,
+          splitId: candidate.splitId,
         },
       })
-      setPaymentAmount('')
+      setSelectedKey('')
       onInvalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add payment')
@@ -327,26 +339,29 @@ function RentLedgerRow({
                   Record a payment
                 </label>
                 <div className="mt-1 flex items-center gap-2">
-                  <input
-                    type="date"
-                    value={paymentDate}
-                    onChange={(event) => setPaymentDate(event.target.value)}
+                  <select
+                    value={selectedKey}
+                    onChange={(event) => setSelectedKey(event.target.value)}
                     className={cn(
-                      'border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+                      'max-w-xs border border-neutral-300 px-2 py-1 dark:border-neutral-700',
                       fieldClass,
                     )}
-                  />
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={paymentAmount}
-                    onChange={(event) => setPaymentAmount(event.target.value)}
-                    className={cn(
-                      'w-24 border border-neutral-300 px-2 py-1 dark:border-neutral-700',
-                      fieldClass,
-                    )}
-                  />
+                  >
+                    <option value="">Select a transaction…</option>
+                    {candidates.map((candidate) => (
+                      <option
+                        key={candidateKey(candidate)}
+                        value={candidateKey(candidate)}
+                      >
+                        {candidate.postedDate} —{' '}
+                        {formatCents(candidate.amountCents)} —{' '}
+                        {candidate.description}
+                        {candidate.categoryName
+                          ? ` (${candidate.categoryName})`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     disabled={saving}
@@ -357,8 +372,8 @@ function RentLedgerRow({
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-neutral-500">
-                  For payments not auto-matched from a transaction — e.g. a
-                  lump-sum deposit split across categories.
+                  Only transactions (or split lines) for this property not
+                  already linked to a payment are shown.
                 </p>
               </div>
             </div>

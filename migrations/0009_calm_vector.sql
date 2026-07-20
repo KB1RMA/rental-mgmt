@@ -1,0 +1,1 @@
+ALTER TABLE `rent_payments` ADD `transaction_split_id` text REFERENCES transaction_splits(id);

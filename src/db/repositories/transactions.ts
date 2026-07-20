@@ -1,7 +1,7 @@
 import { and, desc, eq } from 'drizzle-orm'
 
 import { db } from '#/db'
-import { transactions } from '#/db/schema'
+import { transactionSplits, transactions } from '#/db/schema'
 
 export type NewTransaction = typeof transactions.$inferInsert
 
@@ -37,6 +37,29 @@ export function listTransactionsByCategory(
       eq(transactions.categoryId, categoryId),
     ),
     orderBy: transactions.postedDate,
+  })
+}
+
+export function listTransactionsForProperty(propertyId: string) {
+  return db.query.transactions.findMany({
+    where: eq(transactions.propertyId, propertyId),
+    with: {
+      category: true,
+      splits: { with: { category: true } },
+    },
+    orderBy: desc(transactions.postedDate),
+  })
+}
+
+export function getTransactionById(id: string) {
+  return db.query.transactions.findFirst({
+    where: eq(transactions.id, id),
+  })
+}
+
+export function getTransactionSplitById(id: string) {
+  return db.query.transactionSplits.findFirst({
+    where: eq(transactionSplits.id, id),
   })
 }
 
