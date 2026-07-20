@@ -15,7 +15,6 @@ import {
   getRentChargeForPeriod,
   listLinkedTransactionRefs,
   listRentChargesForLease,
-  rentPaymentExistsForTransaction,
   updateRentChargeAmount as setRentChargeAmount,
   updateRentChargeStatus,
 } from '#/db/repositories/rent'
@@ -23,10 +22,74 @@ import { getCategoryByName } from '#/db/repositories/categories'
 import {
   getTransactionById,
   getTransactionSplitById,
-  listTransactionsByCategory,
   listTransactionsForProperty,
   updateTransactionCategory,
 } from '#/db/repositories/transactions'
+
+interface PaymentCandidate {
+  transactionId: string
+  splitId: string | null
+  postedDate: string
+  amountCents: number
+  description: string
+  categoryId: string | null
+  categoryName: string | null
+}
+
+/**
+ * The property's transactions, expanded into payable line items and
+ * stripped of anything already linked to a rent payment — the single
+ * source of truth for "what money came in and what category is it," used
+ * by both the auto-match sync below and the manual reconcile picker.
+ *
+ * A split transaction's own top-level category is stale the moment it's
+ * split (splitting never clears it — see `transaction-splits.functions.ts`),
+ * so once a transaction has splits only its split lines are considered;
+ * the whole transaction never appears as a candidate. This mirrors how
+ * `expandLineItems` in `lib/profit/monthly-pnl.ts` already treats splits
+ * as authoritative — a transaction is either one line item or N split line
+ * items, never both.
+ */
+async function getPaymentCandidatesForProperty(
+  propertyId: string,
+): Promise<PaymentCandidate[]> {
+  const [transactionList, linked] = await Promise.all([
+    listTransactionsForProperty(propertyId),
+    listLinkedTransactionRefs(),
+  ])
+
+  const candidates: PaymentCandidate[] = []
+
+  for (const transaction of transactionList) {
+    if (transaction.splits.length > 0) {
+      for (const split of transaction.splits) {
+        if (linked.splitIds.has(split.id)) continue
+        candidates.push({
+          transactionId: transaction.id,
+          splitId: split.id,
+          postedDate: transaction.postedDate,
+          amountCents: split.amountCents,
+          description: transaction.merchant ?? transaction.description,
+          categoryId: split.categoryId,
+          categoryName: split.category.name,
+        })
+      }
+    } else {
+      if (linked.transactionIds.has(transaction.id)) continue
+      candidates.push({
+        transactionId: transaction.id,
+        splitId: null,
+        postedDate: transaction.postedDate,
+        amountCents: transaction.amountCents,
+        description: transaction.merchant ?? transaction.description,
+        categoryId: transaction.categoryId,
+        categoryName: transaction.category?.name ?? null,
+      })
+    }
+  }
+
+  return candidates
+}
 
 export const syncAndGetRentLedger = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
@@ -58,23 +121,21 @@ export const syncAndGetRentLedger = createServerFn({ method: 'POST' })
     const rentIncomeCategory = await getCategoryByName('Rent Income')
     if (rentIncomeCategory) {
       const propertyId = lease.unit.property.id
-      const rentTransactions = await listTransactionsByCategory(
-        propertyId,
-        rentIncomeCategory.id,
-      )
+      const candidates = await getPaymentCandidatesForProperty(propertyId)
 
-      for (const transaction of rentTransactions) {
-        if (await rentPaymentExistsForTransaction(transaction.id)) continue
+      for (const candidate of candidates) {
+        if (candidate.categoryId !== rentIncomeCategory.id) continue
 
-        const period = periodForPaymentDate(transaction.postedDate)
+        const period = periodForPaymentDate(candidate.postedDate)
         const charge = await getRentChargeForPeriod(lease.id, period)
         if (!charge) continue
 
         await createRentPayment({
           rentChargeId: charge.id,
-          transactionId: transaction.id,
-          paidDate: transaction.postedDate,
-          amountCents: transaction.amountCents,
+          transactionId: candidate.transactionId,
+          transactionSplitId: candidate.splitId,
+          paidDate: candidate.postedDate,
+          amountCents: candidate.amountCents,
         })
       }
     }
@@ -127,47 +188,7 @@ export const listRentPaymentCandidates = createServerFn({ method: 'GET' })
     const lease = await getActiveLease()
     if (!lease) return []
 
-    const [transactionList, linked] = await Promise.all([
-      listTransactionsForProperty(lease.unit.property.id),
-      listLinkedTransactionRefs(),
-    ])
-
-    const candidates: Array<{
-      transactionId: string
-      splitId: string | null
-      postedDate: string
-      amountCents: number
-      description: string
-      categoryName: string | null
-    }> = []
-
-    for (const transaction of transactionList) {
-      if (transaction.splits.length > 0) {
-        for (const split of transaction.splits) {
-          if (linked.splitIds.has(split.id)) continue
-          candidates.push({
-            transactionId: transaction.id,
-            splitId: split.id,
-            postedDate: transaction.postedDate,
-            amountCents: split.amountCents,
-            description: transaction.merchant ?? transaction.description,
-            categoryName: split.category.name,
-          })
-        }
-      } else {
-        if (linked.transactionIds.has(transaction.id)) continue
-        candidates.push({
-          transactionId: transaction.id,
-          splitId: null,
-          postedDate: transaction.postedDate,
-          amountCents: transaction.amountCents,
-          description: transaction.merchant ?? transaction.description,
-          categoryName: transaction.category?.name ?? null,
-        })
-      }
-    }
-
-    return candidates
+    return getPaymentCandidatesForProperty(lease.unit.property.id)
   })
 
 /**

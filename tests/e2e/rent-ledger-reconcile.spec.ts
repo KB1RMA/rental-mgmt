@@ -12,9 +12,13 @@ import type { Page } from '@playwright/test'
 const fixtureCsvPath = fileURLToPath(
   new URL('../fixtures/sample-reconcile-payment.csv', import.meta.url),
 )
+const autoSplitFixtureCsvPath = fileURLToPath(
+  new URL('../fixtures/sample-autosplit-payment.csv', import.meta.url),
+)
 
-// Category ID from migrations/0002_seed_categories.sql — stable across environments.
+// Category IDs from migrations/0002_seed_categories.sql — stable across environments.
 const RENT_INCOME_ID = '93acc0fa-85cc-4300-8f43-f3755da69e2b'
+const SECURITY_DEPOSITS_ID = '11382258-499c-4ef2-806a-ee86f1e7e7cd'
 
 async function signIn(page: Page) {
   await page.goto('/login')
@@ -79,4 +83,50 @@ test('reconciling a rent charge to a transaction pays the ledger and flows into 
 
   const novemberPnlRow = page.locator('tr', { hasText: '2025-11' })
   await expect(novemberPnlRow.locator('td').nth(1)).toHaveText('$2,950.00')
+})
+
+test('splitting an already auto-matched transaction replaces the stale whole-transaction payment', async ({
+  page,
+}) => {
+  await signIn(page)
+
+  // Imported already categorized Rent Income (Category=Income/Rents), so
+  // visiting /lease auto-matches the whole $4,425 to the 2026-01 charge —
+  // before anyone notices it was really a combined rent + deposit payment.
+  await page.goto('/transactions')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await page.getByLabel('Import CSV').setInputFiles(autoSplitFixtureCsvPath)
+  await page.getByRole('button', { name: 'Import', exact: true }).click()
+  await expect(
+    page.getByText('Imported 1, skipped 0 duplicates, 0 need a category.'),
+  ).toBeVisible()
+
+  const importedRow = page.locator('tr', { hasText: 'Auto Match E2E Payment' })
+  await expect(importedRow.locator('select')).toHaveValue(RENT_INCOME_ID)
+
+  await page.goto('/lease')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  const januaryChargeRow = page.locator('tr', { hasText: '2026-01-01' })
+  await expect(januaryChargeRow.getByText('$4,425.00')).toBeVisible()
+
+  // Correct the mistake: only $1,475 of the $4,425 was actually rent.
+  await page.goto('/transactions')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await importedRow.getByRole('button', { name: 'Split' }).click()
+  const categorySelects = page.locator('select', { hasText: 'Choose category' })
+  await categorySelects.nth(0).selectOption(RENT_INCOME_ID)
+  await page.locator('input[type=number]').nth(0).fill('1475.00')
+  await categorySelects.nth(1).selectOption(SECURITY_DEPOSITS_ID)
+  await page.locator('input[type=number]').nth(1).fill('2950.00')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(importedRow.getByText('Rent Income: $1,475.00')).toBeVisible()
+
+  // Revisiting /lease re-runs the auto-sync. The old $4,425 whole-transaction
+  // payment must be gone (its "whole transaction" view no longer exists once
+  // split) and replaced by a fresh match on just the $1,475 Rent Income
+  // split — never both, which would double-count the same money.
+  await page.goto('/lease')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await expect(januaryChargeRow.getByText('$1,475.00')).toBeVisible()
+  await expect(januaryChargeRow.getByText('$4,425.00')).not.toBeVisible()
 })

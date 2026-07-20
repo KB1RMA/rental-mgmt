@@ -56,14 +56,6 @@ export function deleteRentPayment(id: string) {
   return db.delete(rentPayments).where(eq(rentPayments.id, id)).run()
 }
 
-export async function rentPaymentExistsForTransaction(transactionId: string) {
-  const existing = await db.query.rentPayments.findFirst({
-    where: eq(rentPayments.transactionId, transactionId),
-    columns: { id: true },
-  })
-  return existing != null
-}
-
 export async function listLinkedTransactionRefs() {
   const rows = await db.query.rentPayments.findMany({
     columns: { transactionId: true, transactionSplitId: true },
