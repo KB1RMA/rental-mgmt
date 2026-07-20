@@ -2,11 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { authMiddleware } from '#/lib/auth-middleware'
-import {
-  generateChargePeriods,
-  periodForPaymentDate,
-  computeChargeStatus,
-} from '#/lib/rent/ledger'
+import { generateChargePeriods, computeChargeStatus } from '#/lib/rent/ledger'
 import { getActiveLease } from '#/db/repositories/leases'
 import {
   createRentCharge,
@@ -37,10 +33,9 @@ interface PaymentCandidate {
 }
 
 /**
- * The property's transactions, expanded into payable line items and
- * stripped of anything already linked to a rent payment — the single
- * source of truth for "what money came in and what category is it," used
- * by both the auto-match sync below and the manual reconcile picker.
+ * The property's transactions, expanded into payable line items and stripped
+ * of anything already linked to a rent payment — the pool the manual reconcile
+ * picker offers so a payment is always tied to a real bank transaction.
  *
  * A split transaction's own top-level category is stale the moment it's
  * split (splitting never clears it — see `transaction-splits.functions.ts`),
@@ -49,6 +44,12 @@ interface PaymentCandidate {
  * `expandLineItems` in `lib/profit/monthly-pnl.ts` already treats splits
  * as authoritative — a transaction is either one line item or N split line
  * items, never both.
+ *
+ * Anything already categorized as a non-income type (an expense, a security
+ * deposit `transfer`, etc.) is excluded: it can never be the payment for a
+ * rent charge, so it must not appear in the picker where a mistaken pick would
+ * silently relabel it as income. Uncategorized whole transactions are kept —
+ * they're the reconcile-uncategorized case, and get categorized on link.
  */
 async function getPaymentCandidatesForProperty(
   propertyId: string,
@@ -64,6 +65,7 @@ async function getPaymentCandidatesForProperty(
     if (transaction.splits.length > 0) {
       for (const split of transaction.splits) {
         if (linked.splitIds.has(split.id)) continue
+        if (split.category.type !== 'income') continue
         candidates.push({
           transactionId: transaction.id,
           splitId: split.id,
@@ -76,6 +78,8 @@ async function getPaymentCandidatesForProperty(
       }
     } else {
       if (linked.transactionIds.has(transaction.id)) continue
+      if (transaction.category && transaction.category.type !== 'income')
+        continue
       candidates.push({
         transactionId: transaction.id,
         splitId: null,
@@ -114,28 +118,6 @@ export const syncAndGetRentLedger = createServerFn({ method: 'POST' })
           dueDate,
           amountCents: lease.rentCents,
           status: 'due',
-        })
-      }
-    }
-
-    const rentIncomeCategory = await getCategoryByName('Rent Income')
-    if (rentIncomeCategory) {
-      const propertyId = lease.unit.property.id
-      const candidates = await getPaymentCandidatesForProperty(propertyId)
-
-      for (const candidate of candidates) {
-        if (candidate.categoryId !== rentIncomeCategory.id) continue
-
-        const period = periodForPaymentDate(candidate.postedDate)
-        const charge = await getRentChargeForPeriod(lease.id, period)
-        if (!charge) continue
-
-        await createRentPayment({
-          rentChargeId: charge.id,
-          transactionId: candidate.transactionId,
-          transactionSplitId: candidate.splitId,
-          paidDate: candidate.postedDate,
-          amountCents: candidate.amountCents,
         })
       }
     }
