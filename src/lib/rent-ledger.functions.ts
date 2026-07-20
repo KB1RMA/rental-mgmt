@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { z } from 'zod'
 
 import { authMiddleware } from '#/lib/auth-middleware'
 import {
@@ -10,9 +11,11 @@ import { getActiveLease } from '#/db/repositories/leases'
 import {
   createRentCharge,
   createRentPayment,
+  deleteRentPayment as deleteRentPaymentRow,
   getRentChargeForPeriod,
   listRentChargesForLease,
   rentPaymentExistsForTransaction,
+  updateRentChargeAmount as setRentChargeAmount,
   updateRentChargeStatus,
 } from '#/db/repositories/rent'
 import { getCategoryByName } from '#/db/repositories/categories'
@@ -88,4 +91,47 @@ export const syncAndGetRentLedger = createServerFn({ method: 'POST' })
     }
 
     return listRentChargesForLease(lease.id)
+  })
+
+/**
+ * Overrides a charge's expected amount — needed for a prorated first/last
+ * month, where the flat lease rent doesn't match what was actually owed.
+ */
+export const updateRentChargeAmount = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator(
+    z.object({ chargeId: z.string(), amountCents: z.number().int().min(0) }),
+  )
+  .handler(async ({ data }) => {
+    await setRentChargeAmount(data.chargeId, data.amountCents)
+  })
+
+/**
+ * Records a payment against a charge without requiring a matching bank
+ * transaction — for cases like a lump-sum move-in payment that was split
+ * across categories and so isn't visible to the auto-sync's category match.
+ */
+export const addManualRentPayment = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator(
+    z.object({
+      rentChargeId: z.string(),
+      paidDate: z.string(),
+      amountCents: z.number().int(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await createRentPayment({
+      rentChargeId: data.rentChargeId,
+      paidDate: data.paidDate,
+      amountCents: data.amountCents,
+      method: 'manual',
+    })
+  })
+
+export const deleteRentPayment = createServerFn({ method: 'POST' })
+  .middleware([authMiddleware])
+  .validator(z.object({ paymentId: z.string() }))
+  .handler(async ({ data }) => {
+    await deleteRentPaymentRow(data.paymentId)
   })

@@ -6,7 +6,12 @@ import { getActiveLeaseData } from '#/lib/lease.functions'
 import { uploadDocument } from '#/lib/documents.functions'
 import { documentKinds } from '#/db/schema'
 import { formatCents } from '#/lib/format'
-import { syncAndGetRentLedger } from '#/lib/rent-ledger.functions'
+import {
+  addManualRentPayment,
+  deleteRentPayment,
+  syncAndGetRentLedger,
+  updateRentChargeAmount,
+} from '#/lib/rent-ledger.functions'
 import { cn } from '#/lib/cn'
 import { fieldClass } from '#/lib/form-styles'
 
@@ -20,6 +25,9 @@ export const Route = createFileRoute('/_authed/lease')({
   },
   component: LeasePage,
 })
+
+type RentLedger = NonNullable<Awaited<ReturnType<typeof syncAndGetRentLedger>>>
+type RentCharge = RentLedger[number]
 
 const statusStyles: Record<string, string> = {
   paid: 'text-green-700 dark:text-green-400',
@@ -117,38 +125,17 @@ function LeasePage() {
             <th className="py-2 pr-4 text-right">Amount</th>
             <th className="py-2 pr-4 text-right">Paid</th>
             <th className="py-2 pr-4">Status</th>
+            <th className="py-2 pr-4"></th>
           </tr>
         </thead>
         <tbody>
-          {(rentLedger ?? []).map((charge) => {
-            const paidCents = charge.rentPayments.reduce(
-              (sum, payment) => sum + payment.amountCents,
-              0,
-            )
-            return (
-              <tr
-                key={charge.id}
-                className="border-b border-neutral-100 dark:border-neutral-900"
-              >
-                <td className="py-2 pr-4">{charge.period}</td>
-                <td className="py-2 pr-4">{charge.dueDate}</td>
-                <td className="py-2 pr-4 text-right">
-                  {formatCents(charge.amountCents)}
-                </td>
-                <td className="py-2 pr-4 text-right">
-                  {formatCents(paidCents)}
-                </td>
-                <td
-                  className={cn(
-                    'py-2 pr-4 capitalize',
-                    statusStyles[charge.status],
-                  )}
-                >
-                  {charge.status}
-                </td>
-              </tr>
-            )
-          })}
+          {(rentLedger ?? []).map((charge) => (
+            <RentLedgerRow
+              key={charge.id}
+              charge={charge}
+              onInvalidate={() => router.invalidate()}
+            />
+          ))}
         </tbody>
       </table>
 
@@ -206,5 +193,202 @@ function LeasePage() {
       </form>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
+  )
+}
+
+function RentLedgerRow({
+  charge,
+  onInvalidate,
+}: {
+  charge: RentCharge
+  onInvalidate: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [amount, setAmount] = useState((charge.amountCents / 100).toFixed(2))
+  const [paymentDate, setPaymentDate] = useState(charge.dueDate)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const paidCents = charge.rentPayments.reduce(
+    (sum, payment) => sum + payment.amountCents,
+    0,
+  )
+
+  async function handleSaveAmount() {
+    setError(null)
+    setSaving(true)
+    try {
+      await updateRentChargeAmount({
+        data: {
+          chargeId: charge.id,
+          amountCents: Math.round(Number(amount) * 100),
+        },
+      })
+      onInvalidate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save amount')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAddPayment() {
+    setError(null)
+    if (!paymentAmount || Number(paymentAmount) === 0) {
+      setError('Enter a payment amount')
+      return
+    }
+    setSaving(true)
+    try {
+      await addManualRentPayment({
+        data: {
+          rentChargeId: charge.id,
+          paidDate: paymentDate,
+          amountCents: Math.round(Number(paymentAmount) * 100),
+        },
+      })
+      setPaymentAmount('')
+      onInvalidate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add payment')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeletePayment(paymentId: string) {
+    setSaving(true)
+    try {
+      await deleteRentPayment({ data: { paymentId } })
+      onInvalidate()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <tr className="border-b border-neutral-100 dark:border-neutral-900">
+        <td className="py-2 pr-4">{charge.period}</td>
+        <td className="py-2 pr-4">{charge.dueDate}</td>
+        <td className="py-2 pr-4 text-right">
+          {formatCents(charge.amountCents)}
+        </td>
+        <td className="py-2 pr-4 text-right">{formatCents(paidCents)}</td>
+        <td className={cn('py-2 pr-4 capitalize', statusStyles[charge.status])}>
+          {charge.status}
+        </td>
+        <td className="py-2 pr-4 text-right whitespace-nowrap">
+          <button
+            type="button"
+            onClick={() => setOpen((prev) => !prev)}
+            className="text-xs text-blue-600 underline dark:text-blue-400"
+          >
+            {open ? 'Close' : 'Reconcile'}
+          </button>
+        </td>
+      </tr>
+      {open && (
+        <tr className="border-b border-neutral-100 bg-neutral-50 dark:border-neutral-900 dark:bg-neutral-900">
+          <td colSpan={6} className="p-3">
+            <div className="flex flex-wrap items-end gap-6">
+              <div>
+                <label className="block text-xs text-neutral-500">
+                  Expected amount
+                </label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                    className={cn(
+                      'w-28 border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+                      fieldClass,
+                    )}
+                  />
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void handleSaveAmount()}
+                    className="text-xs text-blue-600 underline disabled:opacity-50 dark:text-blue-400"
+                  >
+                    Save
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-neutral-500">
+                  Override for a prorated first/last month.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs text-neutral-500">
+                  Record a payment
+                </label>
+                <div className="mt-1 flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(event) => setPaymentDate(event.target.value)}
+                    className={cn(
+                      'border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+                      fieldClass,
+                    )}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={paymentAmount}
+                    onChange={(event) => setPaymentAmount(event.target.value)}
+                    className={cn(
+                      'w-24 border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+                      fieldClass,
+                    )}
+                  />
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void handleAddPayment()}
+                    className="text-xs text-blue-600 underline disabled:opacity-50 dark:text-blue-400"
+                  >
+                    Add
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-neutral-500">
+                  For payments not auto-matched from a transaction — e.g. a
+                  lump-sum deposit split across categories.
+                </p>
+              </div>
+            </div>
+
+            {charge.rentPayments.length > 0 && (
+              <ul className="mt-3 space-y-1 text-xs">
+                {charge.rentPayments.map((payment) => (
+                  <li key={payment.id} className="flex items-center gap-2">
+                    <span>
+                      {payment.paidDate} — {formatCents(payment.amountCents)}{' '}
+                      <span className="text-neutral-500">
+                        ({payment.transactionId ? 'from transaction' : 'manual'}
+                        )
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeletePayment(payment.id)}
+                      className="text-red-600 underline dark:text-red-400"
+                    >
+                      Delete
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+          </td>
+        </tr>
+      )}
+    </>
   )
 }

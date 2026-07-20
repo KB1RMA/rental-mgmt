@@ -43,6 +43,19 @@ export function createRentPayment(input: NewRentPayment) {
   return db.insert(rentPayments).values(input).returning().get()
 }
 
+export function updateRentChargeAmount(id: string, amountCents: number) {
+  return db
+    .update(rentCharges)
+    .set({ amountCents })
+    .where(eq(rentCharges.id, id))
+    .returning()
+    .get()
+}
+
+export function deleteRentPayment(id: string) {
+  return db.delete(rentPayments).where(eq(rentPayments.id, id)).run()
+}
+
 export async function rentPaymentExistsForTransaction(transactionId: string) {
   const existing = await db.query.rentPayments.findFirst({
     where: eq(rentPayments.transactionId, transactionId),
