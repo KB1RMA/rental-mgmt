@@ -1,3 +1,10 @@
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# Drizzle-generated migration metadata — machine-written, rewritten on every
+# `drizzle-kit generate`, so not subject to prettier formatting.
+migrations/meta/
+
+# Local, gitignored editor/agent config.
+.claude/
