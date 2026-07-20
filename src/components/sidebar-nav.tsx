@@ -33,6 +33,10 @@ export default function SidebarNav({
   const pathname = useRouterState({ select: (s) => s.location.pathname })
 
   useEffect(() => {
+    // Read persisted state after mount, not in a lazy initializer: localStorage
+    // isn't available during SSR, and seeding initial state from it would cause
+    // a hydration mismatch. Rendering `false` first then correcting is intended.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (localStorage.getItem(STORAGE_KEY) === 'true') setCollapsed(true)
   }, [])
 
