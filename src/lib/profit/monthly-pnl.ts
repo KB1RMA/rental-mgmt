@@ -1,5 +1,5 @@
 export interface PnlCategory {
-  type: 'income' | 'expense' | 'transfer' | 'ignore'
+  type: 'income' | 'expense' | 'transfer' | 'ignore' | 'equity'
   scheduleELine: string | null
 }
 
@@ -133,10 +133,20 @@ export function computeMonthlyPnl(input: {
 
   const byPeriod = new Map<
     string,
-    { incomeCents: number; expenseCents: number; mortgage: LineItem[] }
+    {
+      incomeCents: number
+      expenseCents: number
+      equityCents: number
+      mortgage: LineItem[]
+    }
   >()
   for (const period of periods) {
-    byPeriod.set(period, { incomeCents: 0, expenseCents: 0, mortgage: [] })
+    byPeriod.set(period, {
+      incomeCents: 0,
+      expenseCents: 0,
+      equityCents: 0,
+      mortgage: [],
+    })
   }
 
   for (const item of items) {
@@ -153,6 +163,8 @@ export function computeMonthlyPnl(input: {
       if (item.category.scheduleELine === 'mortgage_interest') {
         bucket.mortgage.push(item)
       }
+    } else if (item.category.type === 'equity') {
+      bucket.equityCents += magnitude
     }
   }
 
@@ -163,19 +175,20 @@ export function computeMonthlyPnl(input: {
       0,
     )
     const mortgagePaymentCount = bucket.mortgage.length
-    const principalExcludedCents = Math.min(
-      monthlyPrincipalCents * mortgagePaymentCount,
-      mortgageCents,
-    )
+    const principalExcludedCents =
+      bucket.equityCents > 0
+        ? bucket.equityCents
+        : Math.min(monthlyPrincipalCents * mortgagePaymentCount, mortgageCents)
 
-    const cashFlowNetCents = bucket.incomeCents - bucket.expenseCents
-    const operatingExpenseCents = bucket.expenseCents - principalExcludedCents
+    const expenseCents = bucket.expenseCents + bucket.equityCents
+    const cashFlowNetCents = bucket.incomeCents - expenseCents
+    const operatingExpenseCents = expenseCents - principalExcludedCents
     const operatingNetCents = bucket.incomeCents - operatingExpenseCents
 
     return {
       period,
       incomeCents: bucket.incomeCents,
-      expenseCents: bucket.expenseCents,
+      expenseCents,
       mortgageCents,
       mortgagePaymentCount,
       principalExcludedCents,

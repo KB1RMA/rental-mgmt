@@ -144,9 +144,9 @@ function RenewalPage() {
         </button>
       </div>
       <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-        Operating excludes your estimated monthly mortgage principal — the rest
-        of the mortgage payment (interest and escrowed property tax) stays in
-        either view.
+        Operating excludes the mortgage principal portion (actual, for any
+        payment you've split by category; otherwise your estimate below) —
+        interest and escrowed property tax stay in either view.
       </p>
 
       <h2 className="mt-8 text-xl font-semibold">Monthly P&L</h2>

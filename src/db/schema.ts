@@ -212,6 +212,7 @@ export const categoryTypes = [
   'expense',
   'transfer',
   'ignore',
+  'equity',
 ] as const
 
 export const categories = sqliteTable('categories', {

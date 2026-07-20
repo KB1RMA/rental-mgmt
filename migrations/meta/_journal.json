@@ -57,6 +57,13 @@
       "when": 1784494031889,
       "tag": "0007_add_condo_water_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784506907071,
+      "tag": "0008_add_mortgage_principal_escrow_categories",
+      "breakpoints": true
     }
   ]
 }

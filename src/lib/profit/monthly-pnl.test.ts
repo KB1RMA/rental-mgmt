@@ -15,6 +15,8 @@ const mortgage = {
 }
 const deposit = { type: 'transfer' as const, scheduleELine: null }
 const ignore = { type: 'ignore' as const, scheduleELine: null }
+const principal = { type: 'equity' as const, scheduleELine: null }
+const escrow = { type: 'expense' as const, scheduleELine: 'taxes' }
 
 function txn(
   postedDate: string,
@@ -180,6 +182,60 @@ describe('computeMonthlyPnl', () => {
     expect(rows[0].mortgagePaymentCount).toBe(2)
     expect(rows[0].mortgageCents).toBe(360000)
     expect(rows[0].principalExcludedCents).toBe(100000)
+  })
+
+  it('uses the real split principal amount instead of the flat estimate when a mortgage payment is split', () => {
+    const { rows } = computeMonthlyPnl({
+      transactions: [
+        txn('2025-11-05', 295000, income),
+        txn('2025-11-01', 150359, mortgage, [
+          { amountCents: 43037, category: principal },
+          { amountCents: 53579, category: mortgage },
+          { amountCents: 53743, category: escrow },
+        ]),
+      ],
+      startPeriod: '2025-11',
+      endPeriod: '2025-11',
+      // flat estimate should be ignored once real split data exists
+      monthlyPrincipalCents: 999999,
+    })
+
+    expect(rows[0].expenseCents).toBe(150359)
+    expect(rows[0].mortgageCents).toBe(53579)
+    expect(rows[0].principalExcludedCents).toBe(43037)
+    expect(rows[0].operatingExpenseCents).toBe(150359 - 43037)
+  })
+
+  it('falls back to the flat principal estimate for an unsplit lump mortgage payment', () => {
+    const { rows } = computeMonthlyPnl({
+      transactions: [
+        txn('2025-11-05', 295000, income),
+        txn('2025-11-01', 180000, mortgage),
+      ],
+      startPeriod: '2025-11',
+      endPeriod: '2025-11',
+      monthlyPrincipalCents: 40000,
+    })
+
+    expect(rows[0].expenseCents).toBe(180000)
+    expect(rows[0].principalExcludedCents).toBe(40000)
+    expect(rows[0].operatingExpenseCents).toBe(140000)
+  })
+
+  it('includes an unsplit equity-type transaction in cash flow but excludes it from operating expense', () => {
+    const { rows } = computeMonthlyPnl({
+      transactions: [
+        txn('2025-11-05', 295000, income),
+        txn('2025-11-10', 50000, principal),
+      ],
+      startPeriod: '2025-11',
+      endPeriod: '2025-11',
+      monthlyPrincipalCents: 0,
+    })
+
+    expect(rows[0].expenseCents).toBe(50000)
+    expect(rows[0].operatingExpenseCents).toBe(0)
+    expect(rows[0].principalExcludedCents).toBe(50000)
   })
 
   it('reports null margin when income is zero', () => {

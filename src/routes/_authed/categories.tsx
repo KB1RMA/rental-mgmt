@@ -44,7 +44,7 @@ function CategoriesPage() {
           data: {
             name: String(formData.get('name') ?? ''),
             type: String(formData.get('type') ?? 'expense') as
-              'income' | 'expense' | 'transfer' | 'ignore',
+              (typeof categoryTypes)[number],
             scheduleELine: String(formData.get('scheduleELine') ?? '') as
               (typeof scheduleELines)[number] | '',
           },
