@@ -59,12 +59,12 @@ function TransactionsPage() {
             (transaction) =>
               transaction.categoryId == null && transaction.splits.length === 0,
           )
-        : transactions.filter(
-            (transaction) =>
-              transaction.categoryId === categoryFilter ||
-              transaction.splits.some(
-                (split) => split.categoryId === categoryFilter,
-              ),
+        : transactions.filter((transaction) =>
+            transaction.splits.length > 0
+              ? transaction.splits.some(
+                  (split) => split.categoryId === categoryFilter,
+                )
+              : transaction.categoryId === categoryFilter,
           )
 
   async function handleUpload(event: SubmitEvent<HTMLFormElement>) {

@@ -215,6 +215,49 @@ test('filters a split transaction by any of its split categories', async ({
   await expect(splitRow).not.toBeVisible()
 })
 
+test('filtering excludes a transaction once it is split into categories that no longer include its original one', async ({
+  page,
+}) => {
+  await signIn(page)
+  await page.goto('/transactions')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+
+  // The "Remote Deposit" transaction from the property-manager import test
+  // (04/01/2026) was auto-categorized as Rent Income before any split
+  // existed. There's a second "Remote Deposit" row from the bank-statement
+  // import test (08/01/2026), so scope the locator to the date too.
+  const row = page
+    .locator('tr', { hasText: 'Remote Deposit' })
+    .filter({ hasText: '2026-04-01' })
+  await expect(row.locator('select')).toHaveValue(RENT_INCOME_ID)
+
+  await row.getByRole('button', { name: 'Split' }).click()
+  const categorySelects = page.locator('select', { hasText: 'Choose category' })
+  await categorySelects.nth(0).selectOption(REPAIRS_ID)
+  await page.locator('input[type=number]').nth(0).fill('1000.00')
+  await categorySelects.nth(1).selectOption(OTHER_EXPENSES_ID)
+  await page.locator('input[type=number]').nth(1).fill('1950.00')
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  const splitRow = page
+    .locator('tr', { hasText: 'Remote Deposit' })
+    .filter({ hasText: '2026-04-01' })
+  await expect(splitRow.getByText('Repairs: $1,000.00')).toBeVisible()
+
+  // Rent Income is the transaction's stale original category — none of its
+  // money is categorized that way anymore, so the filter must not match it.
+  await page.getByLabel('Filter by category').selectOption(RENT_INCOME_ID)
+  await expect(splitRow).not.toBeVisible()
+
+  await page.getByLabel('Filter by category').selectOption(REPAIRS_ID)
+  await expect(splitRow).toBeVisible()
+
+  await page.getByLabel('Filter by category').selectOption(OTHER_EXPENSES_ID)
+  await expect(splitRow).toBeVisible()
+
+  await page.getByLabel('Filter by category').selectOption('')
+})
+
 test('deleting a transaction removes it from the table', async ({ page }) => {
   await signIn(page)
   await page.goto('/transactions')
