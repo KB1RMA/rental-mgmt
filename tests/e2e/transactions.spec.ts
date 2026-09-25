@@ -68,6 +68,7 @@ test('filters the transaction list by category', async ({ page }) => {
   const rentRow = page.locator('tr', { hasText: 'Remote Deposit' })
   const repairsRow = page.locator('tr', { hasText: '-$189.34' })
   const feeRow = page.locator('tr', { hasText: 'Ici Fee Example' })
+  const mysteryRow = page.locator('tr', { hasText: 'Mystery Fee Example' })
 
   await expect(rentRow).toBeVisible()
   await expect(repairsRow).toBeVisible()
@@ -79,11 +80,26 @@ test('filters the transaction list by category', async ({ page }) => {
   await expect(rentRow).not.toBeVisible()
   await expect(feeRow).not.toBeVisible()
 
+  // The filter is reflected in the URL, so it survives a reload.
+  await expect(page).toHaveURL(new RegExp(`category=${REPAIRS_ID}`))
+  await page.reload()
+  await expect(page.getByLabel('Filter by category')).toHaveValue(REPAIRS_ID)
+  await expect(repairsRow).toBeVisible()
+  await expect(rentRow).not.toBeVisible()
+
+  // "Uncategorized" surfaces transactions with no category and no splits.
+  await page.getByLabel('Filter by category').selectOption('uncategorized')
+  await expect(mysteryRow).toBeVisible()
+  await expect(rentRow).not.toBeVisible()
+  await expect(repairsRow).not.toBeVisible()
+
   await page.getByLabel('Filter by category').selectOption('')
+  await expect(page).not.toHaveURL(/category=/)
 
   await expect(rentRow).toBeVisible()
   await expect(repairsRow).toBeVisible()
   await expect(feeRow).toBeVisible()
+  await expect(mysteryRow).toBeVisible()
 })
 
 test('manually recategorizing a transaction persists after reload', async ({
@@ -175,6 +191,28 @@ test('splits a lump-sum payment into multiple categories', async ({ page }) => {
   await expect(
     reloadedRow.getByText('Security Deposits: $2,950.00'),
   ).toBeVisible()
+})
+
+test('filters a split transaction by any of its split categories', async ({
+  page,
+}) => {
+  await signIn(page)
+  await page.goto('/transactions')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+
+  // Relies on the split payment saved by an earlier test in this file
+  // (Rent Income x2 + Security Deposits), not on its own transaction category.
+  const splitRow = page.locator('tr', { hasText: '$7,375.00' })
+  await expect(splitRow).toBeVisible()
+
+  await page.getByLabel('Filter by category').selectOption(SECURITY_DEPOSITS_ID)
+  await expect(splitRow).toBeVisible()
+
+  await page.getByLabel('Filter by category').selectOption(RENT_INCOME_ID)
+  await expect(splitRow).toBeVisible()
+
+  await page.getByLabel('Filter by category').selectOption(MORTGAGE_INTEREST_ID)
+  await expect(splitRow).not.toBeVisible()
 })
 
 test('deleting a transaction removes it from the table', async ({ page }) => {

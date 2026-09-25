@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SubmitEvent } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
+import { z } from 'zod'
 
 import {
   deleteTransaction,
@@ -15,7 +16,14 @@ import { cn } from '#/lib/cn'
 import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
 
+const UNCATEGORIZED_FILTER = 'uncategorized'
+
+const transactionsSearchSchema = z.object({
+  category: z.string().optional(),
+})
+
 export const Route = createFileRoute('/_authed/transactions')({
+  validateSearch: transactionsSearchSchema,
   loader: () => getTransactionsPageData(),
   component: TransactionsPage,
 })
@@ -26,22 +34,38 @@ type Category = PageData['categories'][number]
 
 function TransactionsPage() {
   const { transactions, categories } = Route.useLoaderData()
+  const { category: categoryFilter = '' } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<ImportSummary | null>(null)
-  const [categoryFilter, setCategoryFilter] = useState('')
+
+  function setCategoryFilter(value: string) {
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        category: value === '' ? undefined : value,
+      }),
+      replace: true,
+    })
+  }
 
   const filteredTransactions =
     categoryFilter === ''
       ? transactions
-      : transactions.filter(
-          (transaction) =>
-            transaction.categoryId === categoryFilter ||
-            transaction.splits.some(
-              (split) => split.categoryId === categoryFilter,
-            ),
-        )
+      : categoryFilter === UNCATEGORIZED_FILTER
+        ? transactions.filter(
+            (transaction) =>
+              transaction.categoryId == null && transaction.splits.length === 0,
+          )
+        : transactions.filter(
+            (transaction) =>
+              transaction.categoryId === categoryFilter ||
+              transaction.splits.some(
+                (split) => split.categoryId === categoryFilter,
+              ),
+          )
 
   async function handleUpload(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -146,6 +170,7 @@ function TransactionsPage() {
           )}
         >
           <option value="">All categories</option>
+          <option value={UNCATEGORIZED_FILTER}>Uncategorized</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
