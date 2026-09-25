@@ -66,7 +66,13 @@ test('filters the transaction list by category', async ({ page }) => {
   await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
 
   const rentRow = page.locator('tr', { hasText: 'Remote Deposit' })
-  const repairsRow = page.locator('tr', { hasText: '-$189.34' })
+  // Scoped by date as well as amount: renewal.spec.ts's fixture also posts a
+  // -$189.34 transaction ("Renewal E2E Repair"), and since e2e specs share
+  // one D1 and run in a single worker, that row is already in the table by
+  // the time this test runs.
+  const repairsRow = page
+    .locator('tr', { hasText: 'Check' })
+    .filter({ hasText: '2026-04-09' })
   const feeRow = page.locator('tr', { hasText: 'Ici Fee Example' })
   const mysteryRow = page.locator('tr', { hasText: 'Mystery Fee Example' })
 
