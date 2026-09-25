@@ -89,6 +89,10 @@ test('filters the transaction list by category', async ({ page }) => {
   // The filter is reflected in the URL, so it survives a reload.
   await expect(page).toHaveURL(new RegExp(`category=${REPAIRS_ID}`))
   await page.reload()
+  // Read-only assertions below pass against the server-rendered HTML even
+  // before hydration, so without this wait the next interaction (selecting
+  // "Uncategorized") can fire before React has attached its handlers.
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
   await expect(page.getByLabel('Filter by category')).toHaveValue(REPAIRS_ID)
   await expect(repairsRow).toBeVisible()
   await expect(rentRow).not.toBeVisible()

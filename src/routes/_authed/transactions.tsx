@@ -56,15 +56,13 @@ function TransactionsPage() {
       : ''
 
   function setCategoryFilter(value: string) {
-    void retryOnce(() =>
-      navigate({
-        search: (prev) => ({
-          ...prev,
-          category: value === '' ? undefined : value,
-        }),
-        replace: true,
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        category: value === '' ? undefined : value,
       }),
-    )
+      replace: true,
+    })
   }
 
   const filteredTransactions =
