@@ -30,6 +30,18 @@ function TransactionsPage() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<ImportSummary | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState('')
+
+  const filteredTransactions =
+    categoryFilter === ''
+      ? transactions
+      : transactions.filter(
+          (transaction) =>
+            transaction.categoryId === categoryFilter ||
+            transaction.splits.some(
+              (split) => split.categoryId === categoryFilter,
+            ),
+        )
 
   async function handleUpload(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -120,7 +132,29 @@ function TransactionsPage() {
         </p>
       )}
 
-      <table className="mt-6 w-full text-left text-sm">
+      <div className="mt-6">
+        <label className="block text-sm font-medium" htmlFor="category-filter">
+          Filter by category
+        </label>
+        <select
+          id="category-filter"
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+          className={cn(
+            'mt-1 border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+            fieldClass,
+          )}
+        >
+          <option value="">All categories</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <table className="mt-4 w-full text-left text-sm">
         <thead>
           <tr className="border-b border-neutral-200 dark:border-neutral-800">
             <th className="py-2 pr-4">Date</th>
@@ -132,7 +166,7 @@ function TransactionsPage() {
           </tr>
         </thead>
         <tbody>
-          {transactions.map((transaction) => (
+          {filteredTransactions.map((transaction) => (
             <TransactionRow
               key={transaction.id}
               transaction={transaction}
@@ -142,10 +176,12 @@ function TransactionsPage() {
               onDelete={handleDelete}
             />
           ))}
-          {transactions.length === 0 && (
+          {filteredTransactions.length === 0 && (
             <tr>
               <td colSpan={6} className="py-4 text-neutral-500">
-                No transactions yet. Import a CSV to get started.
+                {transactions.length === 0
+                  ? 'No transactions yet. Import a CSV to get started.'
+                  : 'No transactions match this category.'}
               </td>
             </tr>
           )}

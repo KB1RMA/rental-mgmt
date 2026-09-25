@@ -60,6 +60,32 @@ test('imports a CSV, maps categories, and dedupes on re-import', async ({
   ).toBeVisible()
 })
 
+test('filters the transaction list by category', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/transactions')
+  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+
+  const rentRow = page.locator('tr', { hasText: 'Remote Deposit' })
+  const repairsRow = page.locator('tr', { hasText: '-$189.34' })
+  const feeRow = page.locator('tr', { hasText: 'Ici Fee Example' })
+
+  await expect(rentRow).toBeVisible()
+  await expect(repairsRow).toBeVisible()
+  await expect(feeRow).toBeVisible()
+
+  await page.getByLabel('Filter by category').selectOption(REPAIRS_ID)
+
+  await expect(repairsRow).toBeVisible()
+  await expect(rentRow).not.toBeVisible()
+  await expect(feeRow).not.toBeVisible()
+
+  await page.getByLabel('Filter by category').selectOption('')
+
+  await expect(rentRow).toBeVisible()
+  await expect(repairsRow).toBeVisible()
+  await expect(feeRow).toBeVisible()
+})
+
 test('manually recategorizing a transaction persists after reload', async ({
   page,
 }) => {
