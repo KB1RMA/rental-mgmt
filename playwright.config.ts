@@ -7,17 +7,18 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: process.env.CI ? 'github' : 'list',
-  // Vite dev transforms each route on first hit; give cold starts headroom.
-  expect: { timeout: 15_000 },
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm run dev',
+    // The production build, served by the Workers runtime — what deploy
+    // ships, not Vite's dev transforms. Locally, a running `npm run dev` is
+    // reused instead for faster iteration while writing a test.
+    command: 'npm run build && vite preview --port 3000 --strictPort',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: 60_000,
   },
 })
