@@ -23,8 +23,12 @@ Real property/lease data lives in `scripts/seed-lease.sql` (gitignored, local-on
 ## Testing
 
 - Unit tests: `npm test` (vitest). Pure-function logic (CSV parsing, rules engine, rent ledger math) lives in `src/lib/**/*.test.ts` — prefer this over DB-touching tests where the logic can be isolated.
-- E2E: `npm run test:e2e` (Playwright, single worker). **Reset local D1 to a clean state before a real verification run** (see local dev commands above) — state accumulated across many manual test runs in the same session causes flaky failures unrelated to app code.
-- Dev-mode server functions occasionally throw a transient "Failed to fetch" on a cold hit (Vite SSR-transforming a heavy module for the first time). See `src/lib/retry-once.ts` — wrap idempotent operations in `retryOnce()` rather than chasing this as an app bug.
+- E2E: `npm run test:e2e` (Playwright, single worker). Specs import `test`/`expect` and helpers from `tests/e2e/fixtures.ts`, not `@playwright/test`. That fixture:
+  - Clears every runtime-written table before **each test** (`tests/e2e/reset-data.sql`, local D1 only). Tests must set up their own data rather than rely on an earlier test, and a CI retry starts clean. Add new app-written tables to that file.
+  - Fails a test on a hydration error, an uncaught page error, or a server-function **write aborted by navigation**. A "Failed to fetch" in e2e is almost always the test reloading/navigating before a mutation finished, not the dev server — await the UI's confirmation (or `withServerFnWrite()`) before `reloadHydrated()`/`gotoHydrated()`.
+  - `E2E_SERVER_FN_DELAY_MS=500 npm run test:e2e` slows every server-function call to flush out such races locally before CI does.
+- Migrations/seeds still need a fresh local D1 once (see local dev commands above).
+- `src/lib/retry-once.ts` retries a server-function call once on a network-level failure — only wrap idempotent operations in `retryOnce()`.
 - When a UI feature needs verifying against real data, drive it through Playwright/the browser rather than assuming — this project has already caught several real bugs (CI never seeding local D1, a stale cf-typegen step, dark-mode form controls) this way.
 
 ## Deploy
