@@ -27,7 +27,12 @@ const transactionsSearchSchema = z.object({
 
 export const Route = createFileRoute('/_authed/transactions')({
   validateSearch: transactionsSearchSchema,
-  loader: () => getTransactionsPageData(),
+  // Retried here, not just at the call sites that trigger it: a cold-hit
+  // "Failed to fetch" surfaces as a render-time throw from the matched
+  // route, not a rejected promise, so retrying router.invalidate() itself
+  // doesn't help — the loader has to succeed before the router ever marks
+  // the match as errored.
+  loader: () => retryOnce(() => getTransactionsPageData()),
   component: TransactionsPage,
 })
 
