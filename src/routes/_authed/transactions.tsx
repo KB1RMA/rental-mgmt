@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SubmitEvent } from 'react'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
+import { z } from 'zod'
 
 import {
   deleteTransaction,
@@ -14,8 +15,18 @@ import { formatCents, formatScheduleELine } from '#/lib/format'
 import { cn } from '#/lib/cn'
 import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
+import {
+  UNCATEGORIZED_CATEGORY_FILTER,
+  transactionIsUncategorized,
+  transactionMatchesCategory,
+} from '#/lib/transaction-category-filter'
+
+const transactionsSearchSchema = z.object({
+  category: z.string().optional(),
+})
 
 export const Route = createFileRoute('/_authed/transactions')({
+  validateSearch: transactionsSearchSchema,
   loader: () => getTransactionsPageData(),
   component: TransactionsPage,
 })
@@ -26,10 +37,42 @@ type Category = PageData['categories'][number]
 
 function TransactionsPage() {
   const { transactions, categories } = Route.useLoaderData()
+  const { category: rawCategoryFilter = '' } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   const router = useRouter()
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<ImportSummary | null>(null)
+
+  // A bookmarked or hand-edited URL can carry a `category` value that no
+  // longer (or never did) correspond to a real category — fall back to "All
+  // categories" rather than filtering by, and rendering a <select> bound to,
+  // a value with no matching option.
+  const categoryFilter =
+    rawCategoryFilter === '' ||
+    rawCategoryFilter === UNCATEGORIZED_CATEGORY_FILTER ||
+    categories.some((category) => category.id === rawCategoryFilter)
+      ? rawCategoryFilter
+      : ''
+
+  function setCategoryFilter(value: string) {
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        category: value === '' ? undefined : value,
+      }),
+      replace: true,
+    })
+  }
+
+  const filteredTransactions =
+    categoryFilter === ''
+      ? transactions
+      : categoryFilter === UNCATEGORIZED_CATEGORY_FILTER
+        ? transactions.filter(transactionIsUncategorized)
+        : transactions.filter((transaction) =>
+            transactionMatchesCategory(transaction, categoryFilter),
+          )
 
   async function handleUpload(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -120,7 +163,30 @@ function TransactionsPage() {
         </p>
       )}
 
-      <table className="mt-6 w-full text-left text-sm">
+      <div className="mt-6">
+        <label className="block text-sm font-medium" htmlFor="category-filter">
+          Filter by category
+        </label>
+        <select
+          id="category-filter"
+          value={categoryFilter}
+          onChange={(event) => setCategoryFilter(event.target.value)}
+          className={cn(
+            'mt-1 border border-neutral-300 px-2 py-1 dark:border-neutral-700',
+            fieldClass,
+          )}
+        >
+          <option value="">All categories</option>
+          <option value={UNCATEGORIZED_CATEGORY_FILTER}>Uncategorized</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <table className="mt-4 w-full text-left text-sm">
         <thead>
           <tr className="border-b border-neutral-200 dark:border-neutral-800">
             <th className="py-2 pr-4">Date</th>
@@ -132,7 +198,7 @@ function TransactionsPage() {
           </tr>
         </thead>
         <tbody>
-          {transactions.map((transaction) => (
+          {filteredTransactions.map((transaction) => (
             <TransactionRow
               key={transaction.id}
               transaction={transaction}
@@ -142,10 +208,12 @@ function TransactionsPage() {
               onDelete={handleDelete}
             />
           ))}
-          {transactions.length === 0 && (
+          {filteredTransactions.length === 0 && (
             <tr>
               <td colSpan={6} className="py-4 text-neutral-500">
-                No transactions yet. Import a CSV to get started.
+                {transactions.length === 0
+                  ? 'No transactions yet. Import a CSV to get started.'
+                  : 'No transactions match this category.'}
               </td>
             </tr>
           )}
