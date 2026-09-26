@@ -81,6 +81,11 @@ function TransactionsPage() {
     setUploading(true)
     const form = event.currentTarget
     const formData = new FormData(form)
+    // Same id on the original attempt and retryOnce's retry, so a retry that
+    // follows a "Failed to fetch" (server already committed, response just
+    // never arrived) gets back the original result instead of re-running
+    // the import against data it just wrote.
+    formData.set('requestId', crypto.randomUUID())
     try {
       const result = await retryOnce(() =>
         importTransactionsCsv({ data: formData }),

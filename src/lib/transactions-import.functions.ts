@@ -26,10 +26,34 @@ export interface ImportSummary {
   parseErrors: { row: number; message: string }[]
 }
 
+// retry-once.ts retries an import on a transient "Failed to fetch" — but by
+// then the first attempt may have already committed to D1, so a naive retry
+// re-reads its own rows as duplicates and under-reports what actually
+// imported. The client sends the same requestId on both the original call
+// and the retry, so the retry can return the first call's real result
+// instead of recomputing it against data it just wrote. Module-scope, like
+// other per-isolate state in this app — fine for the dev-mode cold-start
+// this exists for; a cache miss in production just falls back to today's
+// behavior.
+const recentImportResults = new Map<
+  string,
+  { summary: ImportSummary; at: number }
+>()
+const RECENT_IMPORT_TTL_MS = 30_000
+
+function rememberImportResult(requestId: string, summary: ImportSummary) {
+  const now = Date.now()
+  for (const [key, entry] of recentImportResults) {
+    if (now - entry.at > RECENT_IMPORT_TTL_MS) recentImportResults.delete(key)
+  }
+  recentImportResults.set(requestId, { summary, at: now })
+}
+
 function parseUploadForm(data: unknown) {
   if (!(data instanceof FormData)) throw new Error('Expected FormData')
   const file = data.get('file')
   const format = data.get('format')
+  const requestId = data.get('requestId')
   if (!(file instanceof File) || file.size === 0) {
     throw new Error('A CSV file is required')
   }
@@ -39,13 +63,21 @@ function parseUploadForm(data: unknown) {
   ) {
     throw new Error('Invalid import format')
   }
-  return { file, format: format as CsvImportFormat }
+  if (typeof requestId !== 'string' || !requestId) {
+    throw new Error('Missing requestId')
+  }
+  return { file, format: format as CsvImportFormat, requestId }
 }
 
 export const importTransactionsCsv = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator(parseUploadForm)
   .handler(async ({ data }): Promise<ImportSummary> => {
+    const cached = recentImportResults.get(data.requestId)
+    if (cached && Date.now() - cached.at <= RECENT_IMPORT_TTL_MS) {
+      return cached.summary
+    }
+
     const [csvText, categories, rules, properties] = await Promise.all([
       data.file.text(),
       listCategories(),
@@ -113,5 +145,6 @@ export const importTransactionsCsv = createServerFn({ method: 'POST' })
       summary.imported += 1
     }
 
+    rememberImportResult(data.requestId, summary)
     return summary
   })
