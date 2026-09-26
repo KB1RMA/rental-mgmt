@@ -1,6 +1,13 @@
 import { fileURLToPath } from 'node:url'
 
-import { test, expect } from '@playwright/test'
+import {
+  expect,
+  gotoHydrated,
+  reloadHydrated,
+  signIn,
+  test,
+  withServerFnWrite,
+} from './fixtures'
 import type { Page } from '@playwright/test'
 
 const fixtureCsvPath = fileURLToPath(
@@ -20,28 +27,64 @@ const OTHER_EXPENSES_ID = '62046bd7-c4f1-4008-a65f-575dc6b398bc'
 const MORTGAGE_INTEREST_ID = 'a4ba3ac4-483e-4bfe-9c5f-f98d24e37173'
 const SECURITY_DEPOSITS_ID = '11382258-499c-4ef2-806a-ee86f1e7e7cd'
 
-async function signIn(page: Page) {
-  await page.goto('/login')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-  await page.getByLabel('Email').fill('e2e-test@example.com')
-  await page.getByLabel('Password').fill('correct horse battery staple')
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL('/')
+// Every test starts from an empty transactions table (see fixtures.ts), so
+// each one imports exactly the data it needs rather than relying on what an
+// earlier test in this file left behind.
+async function importCsv(
+  page: Page,
+  csvPath: string,
+  format: 'property-manager' | 'bank-statement',
+  expectedSummary: string,
+) {
+  await gotoHydrated(page, '/transactions')
+  await page.getByLabel('Source').selectOption(format)
+  await page.getByLabel('Import CSV').setInputFiles(csvPath)
+  await page.getByRole('button', { name: 'Import', exact: true }).click()
+  await expect(page.getByText(expectedSummary)).toBeVisible()
 }
+
+function importPropertyManagerFixture(page: Page) {
+  return importCsv(
+    page,
+    fixtureCsvPath,
+    'property-manager',
+    'Imported 6, skipped 0 duplicates, 1 needs a category.',
+  )
+}
+
+function importMoveInPayment(page: Page) {
+  return importCsv(
+    page,
+    moveInPaymentFixturePath,
+    'bank-statement',
+    'Imported 1, skipped 0 duplicates, 1 needs a category.',
+  )
+}
+
+async function splitMoveInPayment(page: Page) {
+  const row = page.locator('tr', { hasText: '$7,375.00' })
+  await row.getByRole('button', { name: 'Split' }).click()
+  await page.getByRole('button', { name: 'Add line' }).click()
+  const categorySelects = page.locator('select', { hasText: 'Choose category' })
+  const amounts = page.locator('input[type=number]')
+  await categorySelects.nth(0).selectOption(RENT_INCOME_ID)
+  await amounts.nth(0).fill('1475.00')
+  await categorySelects.nth(1).selectOption(RENT_INCOME_ID)
+  await amounts.nth(1).fill('2950.00')
+  await categorySelects.nth(2).selectOption(SECURITY_DEPOSITS_ID)
+  await amounts.nth(2).fill('2950.00')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(row.getByText('Security Deposits: $2,950.00')).toBeVisible()
+}
+
+test.beforeEach(async ({ page }) => {
+  await signIn(page)
+})
 
 test('imports a CSV, maps categories, and dedupes on re-import', async ({
   page,
 }) => {
-  await signIn(page)
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-
-  await page.getByLabel('Import CSV').setInputFiles(fixtureCsvPath)
-  await page.getByRole('button', { name: 'Import', exact: true }).click()
-
-  await expect(
-    page.getByText('Imported 6, skipped 0 duplicates, 1 needs a category.'),
-  ).toBeVisible()
+  await importPropertyManagerFixture(page)
 
   const rentRow = page.locator('tr', { hasText: 'Remote Deposit' })
   await expect(rentRow.locator('select')).toHaveValue(RENT_INCOME_ID)
@@ -61,18 +104,10 @@ test('imports a CSV, maps categories, and dedupes on re-import', async ({
 })
 
 test('filters the transaction list by category', async ({ page }) => {
-  await signIn(page)
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await importPropertyManagerFixture(page)
 
   const rentRow = page.locator('tr', { hasText: 'Remote Deposit' })
-  // Scoped by date as well as amount: renewal.spec.ts's fixture also posts a
-  // -$189.34 transaction ("Renewal E2E Repair"), and since e2e specs share
-  // one D1 and run in a single worker, that row is already in the table by
-  // the time this test runs.
-  const repairsRow = page
-    .locator('tr', { hasText: 'Check' })
-    .filter({ hasText: '2026-04-09' })
+  const repairsRow = page.locator('tr', { hasText: '-$189.34' })
   const feeRow = page.locator('tr', { hasText: 'Ici Fee Example' })
   const mysteryRow = page.locator('tr', { hasText: 'Mystery Fee Example' })
 
@@ -88,11 +123,7 @@ test('filters the transaction list by category', async ({ page }) => {
 
   // The filter is reflected in the URL, so it survives a reload.
   await expect(page).toHaveURL(new RegExp(`category=${REPAIRS_ID}`))
-  await page.reload()
-  // Read-only assertions below pass against the server-rendered HTML even
-  // before hydration, so without this wait the next interaction (selecting
-  // "Uncategorized") can fire before React has attached its handlers.
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await reloadHydrated(page)
   await expect(page.getByLabel('Filter by category')).toHaveValue(REPAIRS_ID)
   await expect(repairsRow).toBeVisible()
   await expect(rentRow).not.toBeVisible()
@@ -115,33 +146,27 @@ test('filters the transaction list by category', async ({ page }) => {
 test('manually recategorizing a transaction persists after reload', async ({
   page,
 }) => {
-  await signIn(page)
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await importPropertyManagerFixture(page)
 
-  const mysteryRow = page.locator('tr', { hasText: 'Mystery Fee Example' })
-  await mysteryRow.locator('select').selectOption(REPAIRS_ID)
+  const mysterySelect = page
+    .locator('tr', { hasText: 'Mystery Fee Example' })
+    .locator('select')
+  await withServerFnWrite(page, () => mysterySelect.selectOption(REPAIRS_ID))
+  await expect(mysterySelect).toHaveValue(REPAIRS_ID)
 
-  await page.reload()
-  await expect(
-    page.locator('tr', { hasText: 'Mystery Fee Example' }).locator('select'),
-  ).toHaveValue(REPAIRS_ID)
+  await reloadHydrated(page)
+  await expect(mysterySelect).toHaveValue(REPAIRS_ID)
 })
 
 test('imports a bank statement export and applies the rules engine', async ({
   page,
 }) => {
-  await signIn(page)
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-
-  await page.getByLabel('Source').selectOption('bank-statement')
-  await page.getByLabel('Import CSV').setInputFiles(bankStatementFixturePath)
-  await page.getByRole('button', { name: 'Import', exact: true }).click()
-
-  await expect(
-    page.getByText('Imported 5, skipped 0 duplicates, 2 need a category.'),
-  ).toBeVisible()
+  await importCsv(
+    page,
+    bankStatementFixturePath,
+    'bank-statement',
+    'Imported 5, skipped 0 duplicates, 2 need a category.',
+  )
 
   const rentRow = page.locator('tr', { hasText: 'Remote Deposit' })
   await expect(rentRow.locator('select')).toHaveValue(RENT_INCOME_ID)
@@ -160,14 +185,7 @@ test('imports a bank statement export and applies the rules engine', async ({
 })
 
 test('splits a lump-sum payment into multiple categories', async ({ page }) => {
-  await signIn(page)
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-
-  await page.getByLabel('Source').selectOption('bank-statement')
-  await page.getByLabel('Import CSV').setInputFiles(moveInPaymentFixturePath)
-  await page.getByRole('button', { name: 'Import', exact: true }).click()
-  await expect(page.getByText(/Imported 1,/)).toBeVisible()
+  await importMoveInPayment(page)
 
   const row = page.locator('tr', { hasText: '$7,375.00' })
   await row.getByRole('button', { name: 'Split' }).click()
@@ -182,38 +200,27 @@ test('splits a lump-sum payment into multiple categories', async ({ page }) => {
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText(/Lines total/)).toBeVisible()
 
-  await page.getByText('Add line').click()
-  const categorySelectsAfterAdd = page.locator('select', {
-    hasText: 'Choose category',
-  })
-  await categorySelectsAfterAdd.nth(2).selectOption(SECURITY_DEPOSITS_ID)
+  await page.getByRole('button', { name: 'Add line' }).click()
+  await categorySelects.nth(2).selectOption(SECURITY_DEPOSITS_ID)
   await page.locator('input[type=number]').nth(2).fill('2950.00')
 
   await page.getByRole('button', { name: 'Save' }).click()
 
-  const savedRow = page.locator('tr', { hasText: '$7,375.00' })
-  await expect(savedRow.getByText('Rent Income: $1,475.00')).toBeVisible()
-  await expect(savedRow.getByText('Rent Income: $2,950.00')).toBeVisible()
-  await expect(savedRow.getByText('Security Deposits: $2,950.00')).toBeVisible()
+  await expect(row.getByText('Rent Income: $1,475.00')).toBeVisible()
+  await expect(row.getByText('Rent Income: $2,950.00')).toBeVisible()
+  await expect(row.getByText('Security Deposits: $2,950.00')).toBeVisible()
 
-  await page.reload()
-  const reloadedRow = page.locator('tr', { hasText: '$7,375.00' })
-  await expect(
-    reloadedRow.getByText('Security Deposits: $2,950.00'),
-  ).toBeVisible()
+  await reloadHydrated(page)
+  await expect(row.getByText('Security Deposits: $2,950.00')).toBeVisible()
 })
 
 test('filters a split transaction by any of its split categories', async ({
   page,
 }) => {
-  await signIn(page)
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await importMoveInPayment(page)
+  await splitMoveInPayment(page)
 
-  // Relies on the split payment saved by an earlier test in this file
-  // (Rent Income x2 + Security Deposits), not on its own transaction category.
   const splitRow = page.locator('tr', { hasText: '$7,375.00' })
-  await expect(splitRow).toBeVisible()
 
   await page.getByLabel('Filter by category').selectOption(SECURITY_DEPOSITS_ID)
   await expect(splitRow).toBeVisible()
@@ -228,17 +235,10 @@ test('filters a split transaction by any of its split categories', async ({
 test('filtering excludes a transaction once it is split into categories that no longer include its original one', async ({
   page,
 }) => {
-  await signIn(page)
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await importPropertyManagerFixture(page)
 
-  // The "Remote Deposit" transaction from the property-manager import test
-  // (04/01/2026) was auto-categorized as Rent Income before any split
-  // existed. There's a second "Remote Deposit" row from the bank-statement
-  // import test (08/01/2026), so scope the locator to the date too.
-  const row = page
-    .locator('tr', { hasText: 'Remote Deposit' })
-    .filter({ hasText: '2026-04-01' })
+  // Auto-categorized as Rent Income on import, before any split existed.
+  const row = page.locator('tr', { hasText: 'Remote Deposit' })
   await expect(row.locator('select')).toHaveValue(RENT_INCOME_ID)
 
   await row.getByRole('button', { name: 'Split' }).click()
@@ -249,32 +249,23 @@ test('filtering excludes a transaction once it is split into categories that no 
   await page.locator('input[type=number]').nth(1).fill('1950.00')
   await page.getByRole('button', { name: 'Save' }).click()
 
-  const splitRow = page
-    .locator('tr', { hasText: 'Remote Deposit' })
-    .filter({ hasText: '2026-04-01' })
-  await expect(splitRow.getByText('Repairs: $1,000.00')).toBeVisible()
+  await expect(row.getByText('Repairs: $1,000.00')).toBeVisible()
 
   // Rent Income is the transaction's stale original category — none of its
   // money is categorized that way anymore, so the filter must not match it.
   await page.getByLabel('Filter by category').selectOption(RENT_INCOME_ID)
-  await expect(splitRow).not.toBeVisible()
+  await expect(row).not.toBeVisible()
 
   await page.getByLabel('Filter by category').selectOption(REPAIRS_ID)
-  await expect(splitRow).toBeVisible()
+  await expect(row).toBeVisible()
 
   await page.getByLabel('Filter by category').selectOption(OTHER_EXPENSES_ID)
-  await expect(splitRow).toBeVisible()
-
-  await page.getByLabel('Filter by category').selectOption('')
+  await expect(row).toBeVisible()
 })
 
 test('deleting a transaction removes it from the table', async ({ page }) => {
-  await signIn(page)
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await importPropertyManagerFixture(page)
 
-  // Relies on the "Mystery Fee Example" transaction imported by an earlier
-  // test in this file (tests in this spec run sequentially and share state).
   const row = page.locator('tr', { hasText: 'Mystery Fee Example' })
   await expect(row).toBeVisible()
 
@@ -282,8 +273,6 @@ test('deleting a transaction removes it from the table', async ({ page }) => {
   await row.getByRole('button', { name: 'Delete' }).click()
   await expect(row).not.toBeVisible()
 
-  await page.reload()
-  await expect(
-    page.locator('tr', { hasText: 'Mystery Fee Example' }),
-  ).not.toBeVisible()
+  await reloadHydrated(page)
+  await expect(row).not.toBeVisible()
 })
