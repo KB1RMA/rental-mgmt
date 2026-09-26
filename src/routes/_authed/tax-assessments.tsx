@@ -11,7 +11,6 @@ import {
 import type { AssessmentImportSummary } from '#/lib/tax-assessments.functions'
 import { formatCents } from '#/lib/format'
 import { cn } from '#/lib/cn'
-import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
 
 export const Route = createFileRoute('/_authed/tax-assessments')({
@@ -41,9 +40,7 @@ function TaxAssessmentsPage() {
     const form = event.currentTarget
     const formData = new FormData(form)
     try {
-      const result = await retryOnce(() =>
-        importTaxAssessmentsCsv({ data: formData }),
-      )
+      const result = await importTaxAssessmentsCsv({ data: formData })
       setSummary(result)
       form.reset()
       await router.invalidate()
@@ -61,18 +58,16 @@ function TaxAssessmentsPage() {
     const form = event.currentTarget
     const formData = new FormData(form)
     try {
-      await retryOnce(() =>
-        createTaxAssessment({
-          data: {
-            fiscalYear: String(formData.get('fiscalYear') ?? ''),
-            land: String(formData.get('land') ?? ''),
-            building: String(formData.get('building') ?? ''),
-            total: String(formData.get('total') ?? ''),
-            taxRate: String(formData.get('taxRate') ?? ''),
-            annualTax: String(formData.get('annualTax') ?? ''),
-          },
-        }),
-      )
+      await createTaxAssessment({
+        data: {
+          fiscalYear: String(formData.get('fiscalYear') ?? ''),
+          land: String(formData.get('land') ?? ''),
+          building: String(formData.get('building') ?? ''),
+          total: String(formData.get('total') ?? ''),
+          taxRate: String(formData.get('taxRate') ?? ''),
+          annualTax: String(formData.get('annualTax') ?? ''),
+        },
+      })
       form.reset()
       await router.invalidate()
     } catch (err) {
@@ -84,7 +79,7 @@ function TaxAssessmentsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this assessment year?')) return
-    await retryOnce(() => deleteTaxAssessment({ data: { id } }))
+    await deleteTaxAssessment({ data: { id } })
     await router.invalidate()
   }
 

@@ -13,7 +13,6 @@ import type { ImportSummary } from '#/lib/transactions-import.functions'
 import { saveTransactionSplits } from '#/lib/transaction-splits.functions'
 import { formatCents, formatScheduleELine } from '#/lib/format'
 import { cn } from '#/lib/cn'
-import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
 import {
   UNCATEGORIZED_CATEGORY_FILTER,
@@ -27,12 +26,7 @@ const transactionsSearchSchema = z.object({
 
 export const Route = createFileRoute('/_authed/transactions')({
   validateSearch: transactionsSearchSchema,
-  // Retried here, not just at the call sites that trigger it: a cold-hit
-  // "Failed to fetch" surfaces as a render-time throw from the matched
-  // route, not a rejected promise, so retrying router.invalidate() itself
-  // doesn't help — the loader has to succeed before the router ever marks
-  // the match as errored.
-  loader: () => retryOnce(() => getTransactionsPageData()),
+  loader: () => getTransactionsPageData(),
   component: TransactionsPage,
 })
 
@@ -86,15 +80,8 @@ function TransactionsPage() {
     setUploading(true)
     const form = event.currentTarget
     const formData = new FormData(form)
-    // Same id on the original attempt and retryOnce's retry, so a retry that
-    // follows a "Failed to fetch" (server already committed, response just
-    // never arrived) gets back the original result instead of re-running
-    // the import against data it just wrote.
-    formData.set('requestId', crypto.randomUUID())
     try {
-      const result = await retryOnce(() =>
-        importTransactionsCsv({ data: formData }),
-      )
+      const result = await importTransactionsCsv({ data: formData })
       setSummary(result)
       form.reset()
       await router.invalidate()
@@ -106,9 +93,7 @@ function TransactionsPage() {
   }
 
   async function handleRecategorize(transactionId: string, categoryId: string) {
-    await retryOnce(() =>
-      recategorizeTransaction({ data: { transactionId, categoryId } }),
-    )
+    await recategorizeTransaction({ data: { transactionId, categoryId } })
     await router.invalidate()
   }
 
@@ -116,15 +101,13 @@ function TransactionsPage() {
     transactionId: string,
     splits: { categoryId: string; amountCents: number }[],
   ) {
-    await retryOnce(() =>
-      saveTransactionSplits({ data: { transactionId, splits } }),
-    )
+    await saveTransactionSplits({ data: { transactionId, splits } })
     await router.invalidate()
   }
 
   async function handleDelete(transactionId: string) {
     if (!confirm('Delete this transaction? This cannot be undone.')) return
-    await retryOnce(() => deleteTransaction({ data: { transactionId } }))
+    await deleteTransaction({ data: { transactionId } })
     await router.invalidate()
   }
 

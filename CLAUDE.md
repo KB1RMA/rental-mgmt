@@ -28,7 +28,6 @@ Real property/lease data lives in `scripts/seed-lease.sql` (gitignored, local-on
   - Fails a test on a hydration error, an uncaught page error, or a server-function **write aborted by navigation**. A "Failed to fetch" in e2e is almost always the test reloading/navigating before a mutation finished, not the dev server — await the UI's confirmation (or `withServerFnWrite()`) before `reloadHydrated()`/`gotoHydrated()`.
   - `E2E_SERVER_FN_DELAY_MS=500 npm run test:e2e` slows every server-function call to flush out such races locally before CI does.
 - Migrations/seeds still need a fresh local D1 once (see local dev commands above).
-- `src/lib/retry-once.ts` retries a server-function call once on a network-level failure — only wrap idempotent operations in `retryOnce()`.
 - When a UI feature needs verifying against real data, drive it through Playwright/the browser rather than assuming — this project has already caught several real bugs (CI never seeding local D1, a stale cf-typegen step, dark-mode form controls) this way.
 
 ## Deploy

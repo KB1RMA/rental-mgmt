@@ -10,7 +10,6 @@ import { parseDollarsToCents } from '#/lib/csv/parse-tax-assessments'
 import { computeProjection } from '#/lib/profit/projection'
 import { formatCents } from '#/lib/format'
 import { cn } from '#/lib/cn'
-import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
 import { MonthlyPnlChart } from '#/components/monthly-pnl-chart'
 
@@ -88,16 +87,14 @@ function RenewalPage() {
     setError(null)
     setSaving(true)
     try {
-      await retryOnce(() =>
-        saveRenewalAssumptions({
-          data: {
-            proposedRent,
-            monthlyPrincipal,
-            monthlyExpenseOverride,
-            notes,
-          },
-        }),
-      )
+      await saveRenewalAssumptions({
+        data: {
+          proposedRent,
+          monthlyPrincipal,
+          monthlyExpenseOverride,
+          notes,
+        },
+      })
       await router.invalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
