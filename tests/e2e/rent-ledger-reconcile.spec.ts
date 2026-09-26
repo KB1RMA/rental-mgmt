@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 
-import { test, expect } from '@playwright/test'
+import { expect, gotoHydrated, signIn, test } from './fixtures'
 import type { Page } from '@playwright/test'
 
 // Uncategorized on import (blank Category/Sub-Category) and dated in the
@@ -43,22 +43,12 @@ async function pickCandidateValue(
   return value
 }
 
-async function signIn(page: Page) {
-  await page.goto('/login')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-  await page.getByLabel('Email').fill('e2e-test@example.com')
-  await page.getByLabel('Password').fill('correct horse battery staple')
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL('/')
-}
-
 test('reconciling a rent charge to a transaction pays the ledger and flows into the P&L', async ({
   page,
 }) => {
   await signIn(page)
 
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/transactions')
   await page.getByLabel('Import CSV').setInputFiles(fixtureCsvPath)
   await page.getByRole('button', { name: 'Import', exact: true }).click()
   await expect(
@@ -68,8 +58,7 @@ test('reconciling a rent charge to a transaction pays the ledger and flows into 
   const importedRow = page.locator('tr', { hasText: 'Reconcile E2E Payment' })
   await expect(importedRow.locator('select')).toHaveValue('')
 
-  await page.goto('/lease')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/lease')
 
   // Due date, not period, to avoid also matching the payment's own posted
   // date (2025-11-05) once the reconcile panel below renders it.
@@ -95,14 +84,12 @@ test('reconciling a rent charge to a transaction pays the ledger and flows into 
 
   // The reconcile action should have categorized the previously-uncategorized
   // transaction as Rent Income.
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/transactions')
   await expect(importedRow.locator('select')).toHaveValue(RENT_INCOME_ID)
 
   // ...which is what makes it show up here: the P&L is driven entirely by
   // category type, not by rent_payments.
-  await page.goto('/renewal')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/renewal')
 
   const novemberPnlRow = page.locator('tr', { hasText: '2025-11' })
   await expect(novemberPnlRow.locator('td').nth(1)).toHaveText('$2,950.00')
@@ -117,8 +104,7 @@ test('a move-in split across two rent lines and a deposit reconciles per line', 
   // first full month) plus a $1,475 security deposit. Nothing is booked
   // automatically — each rent line is picked against its own charge, and the
   // deposit (a `transfer`) is never offered as a rent payment at all.
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/transactions')
   await page.getByLabel('Import CSV').setInputFiles(moveInFixtureCsvPath)
   await page.getByRole('button', { name: 'Import', exact: true }).click()
   await expect(
@@ -142,11 +128,8 @@ test('a move-in split across two rent lines and a deposit reconciles per line', 
 
   // On /lease, both rent lines are offered as pickable candidates and the
   // deposit is not — exactly two options carry this transaction's name (the
-  // deposit, a `transfer`, is never a rent-payment candidate). Asserting on
-  // candidates rather than a charge's paid total keeps this independent of
-  // other specs' data in the shared local D1.
-  await page.goto('/lease')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  // deposit, a `transfer`, is never a rent-payment candidate).
+  await gotoHydrated(page, '/lease')
   const decemberChargeRow = page.locator('tr', { hasText: '2025-12-01' })
   await decemberChargeRow.getByRole('button', { name: 'Reconcile' }).click()
   const paymentSelect = page.locator('select', {
@@ -176,8 +159,7 @@ test('editing an unrelated split line preserves a manually reconciled payment', 
   // The $1,475 rent line is reconciled to June, then an *unrelated* split line
   // (the deposit) is edited — a probe of whether that reconciled payment
   // survives the edit rather than being silently dropped.
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/transactions')
   await page.getByLabel('Import CSV').setInputFiles(splitEditFixtureCsvPath)
   await page.getByRole('button', { name: 'Import', exact: true }).click()
   await expect(
@@ -201,8 +183,7 @@ test('editing an unrelated split line preserves a manually reconciled payment', 
   ).toBeVisible()
 
   // Manually reconcile the $1,475 rent line to June.
-  await page.goto('/lease')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/lease')
   const juneChargeRow = page.locator('tr', { hasText: '2026-06-01' })
   await juneChargeRow.getByRole('button', { name: 'Reconcile' }).click()
   const paymentSelect = page.locator('select', {
@@ -212,15 +193,13 @@ test('editing an unrelated split line preserves a manually reconciled payment', 
     await pickCandidateValue(page, 'Split Edit E2E Payment', '$1,475.00'),
   )
   await page.getByRole('button', { name: 'Add' }).click()
-  // Assert on this payment's unique line (posted date + amount), not June's
-  // aggregate paid column, so shared-DB data from other specs can't skew it.
+  // Assert on this payment's own line (posted date + amount).
   await expect(page.getByText('2026-06-05 — $1,475.00')).toBeVisible()
 
   // Now edit only the *deposit* line — recategorize it, leaving both rent
   // lines untouched. The reconciled rent payment must survive this: it's the
   // same economic line, not a stale link.
-  await page.goto('/transactions')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/transactions')
   await importedRow.getByRole('button', { name: 'Edit split' }).click()
   categorySelects = page.locator('select', { hasText: 'Choose category' })
   await categorySelects.nth(2).selectOption(OWNER_DISTRIBUTIONS_ID)
@@ -231,8 +210,7 @@ test('editing an unrelated split line preserves a manually reconciled payment', 
 
   // Re-open June's reconcile panel: the $1,475 payment line must still be
   // there — preserved across the edit, not silently dropped.
-  await page.goto('/lease')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/lease')
   await juneChargeRow.getByRole('button', { name: 'Reconcile' }).click()
   await expect(page.getByText('2026-06-05 — $1,475.00')).toBeVisible()
 })

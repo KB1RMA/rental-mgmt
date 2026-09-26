@@ -1,27 +1,16 @@
 import { fileURLToPath } from 'node:url'
 
-import { test, expect } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import { expect, gotoHydrated, signIn, test } from './fixtures'
 
 const fixtureCsvPath = fileURLToPath(
   new URL('../fixtures/sample-tax-assessments.csv', import.meta.url),
 )
 
-async function signIn(page: Page) {
-  await page.goto('/login')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-  await page.getByLabel('Email').fill('e2e-test@example.com')
-  await page.getByLabel('Password').fill('correct horse battery staple')
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL('/')
-}
-
 test('imports a tax-assessment CSV, derives totals, and upserts on re-import', async ({
   page,
 }) => {
   await signIn(page)
-  await page.goto('/tax-assessments')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/tax-assessments')
 
   await page.getByLabel('Import CSV').setInputFiles(fixtureCsvPath)
   await page.getByRole('button', { name: 'Import', exact: true }).click()
@@ -47,8 +36,7 @@ test('manual entry derives total and annual tax when left blank', async ({
   page,
 }) => {
   await signIn(page)
-  await page.goto('/tax-assessments')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/tax-assessments')
 
   await page.getByLabel('Fiscal year').fill('2020')
   await page.getByLabel('Land ($)').fill('50000')
@@ -63,8 +51,7 @@ test('manual entry derives total and annual tax when left blank', async ({
 
 test('deleting an assessment removes it from the table', async ({ page }) => {
   await signIn(page)
-  await page.goto('/tax-assessments')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/tax-assessments')
 
   await page.getByLabel('Fiscal year').fill('2019')
   await page.getByLabel('Land ($)').fill('10000')

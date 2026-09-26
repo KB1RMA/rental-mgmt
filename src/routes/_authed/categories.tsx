@@ -10,7 +10,6 @@ import {
 import { categoryTypes, scheduleELines } from '#/db/schema'
 import { formatScheduleELine } from '#/lib/format'
 import { cn } from '#/lib/cn'
-import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
 
 export const Route = createFileRoute('/_authed/categories')({
@@ -39,18 +38,16 @@ function CategoriesPage() {
     const form = event.currentTarget
     const formData = new FormData(form)
     try {
-      await retryOnce(() =>
-        createCategoryFn({
-          data: {
-            name: String(formData.get('name') ?? ''),
-            type: String(
-              formData.get('type') ?? 'expense',
-            ) as (typeof categoryTypes)[number],
-            scheduleELine: String(formData.get('scheduleELine') ?? '') as
-              (typeof scheduleELines)[number] | '',
-          },
-        }),
-      )
+      await createCategoryFn({
+        data: {
+          name: String(formData.get('name') ?? ''),
+          type: String(
+            formData.get('type') ?? 'expense',
+          ) as (typeof categoryTypes)[number],
+          scheduleELine: String(formData.get('scheduleELine') ?? '') as
+            (typeof scheduleELines)[number] | '',
+        },
+      })
       form.reset()
       await router.invalidate()
     } catch (err) {
@@ -177,11 +174,9 @@ function CategoryRow({ category }: { category: Category }) {
     setError(null)
     setSaving(true)
     try {
-      await retryOnce(() =>
-        updateCategoryFn({
-          data: { id: category.id, name, type, scheduleELine },
-        }),
-      )
+      await updateCategoryFn({
+        data: { id: category.id, name, type, scheduleELine },
+      })
       setEditing(false)
       await router.invalidate()
     } catch (err) {

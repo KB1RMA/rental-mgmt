@@ -2,25 +2,15 @@ import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
-import { test, expect } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import { expect, gotoHydrated, signIn, test } from './fixtures'
 
 const fixtureDocPath = fileURLToPath(
   new URL('../fixtures/sample-document.txt', import.meta.url),
 )
 
-async function signIn(page: Page) {
-  await page.goto('/login')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-  await page.getByLabel('Email').fill('e2e-test@example.com')
-  await page.getByLabel('Password').fill('correct horse battery staple')
-  await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page).toHaveURL('/')
-}
-
 test('lease page shows seeded terms and renewal deadline', async ({ page }) => {
   await signIn(page)
-  await page.goto('/lease')
+  await gotoHydrated(page, '/lease')
 
   await expect(
     page.getByRole('heading', { name: 'Example Property' }),
@@ -34,22 +24,13 @@ test('uploads a document and downloads it back byte-identical', async ({
   page,
 }) => {
   await signIn(page)
-  await page.goto('/lease')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
-
-  const documentCountBefore = await page
-    .getByRole('link', { name: 'sample-document.txt' })
-    .count()
+  await gotoHydrated(page, '/lease')
 
   await page.getByLabel('File').setInputFiles(fixtureDocPath)
   await page.getByRole('button', { name: 'Upload' }).click()
 
-  const downloadLink = page
-    .getByRole('link', { name: 'sample-document.txt' })
-    .last()
-  await expect(
-    page.getByRole('link', { name: 'sample-document.txt' }),
-  ).toHaveCount(documentCountBefore + 1)
+  const downloadLink = page.getByRole('link', { name: 'sample-document.txt' })
+  await expect(downloadLink).toHaveCount(1)
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),

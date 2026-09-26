@@ -1,7 +1,7 @@
-import { test, expect } from '@playwright/test'
+import { expect, gotoHydrated, test } from './fixtures'
 
 test('unauthenticated visitors are redirected to login', async ({ page }) => {
-  await page.goto('/')
+  await gotoHydrated(page, '/')
   await expect(page).toHaveURL(/\/login/)
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
 })
@@ -21,8 +21,7 @@ test('sign-up is disabled', async ({ page }) => {
 })
 
 test('sign in then dashboard access', async ({ page }) => {
-  await page.goto('/login')
-  await page.waitForFunction(() => !window.$_TSR || window.$_TSR.hydrated)
+  await gotoHydrated(page, '/login')
   await page.getByLabel('Email').fill('e2e-test@example.com')
   await page.getByLabel('Password').fill('correct horse battery staple')
   await page.getByRole('button', { name: 'Sign in' }).click()

@@ -13,7 +13,6 @@ import type { ImportSummary } from '#/lib/transactions-import.functions'
 import { saveTransactionSplits } from '#/lib/transaction-splits.functions'
 import { formatCents, formatScheduleELine } from '#/lib/format'
 import { cn } from '#/lib/cn'
-import { retryOnce } from '#/lib/retry-once'
 import { fieldClass } from '#/lib/form-styles'
 import {
   UNCATEGORIZED_CATEGORY_FILTER,
@@ -82,9 +81,7 @@ function TransactionsPage() {
     const form = event.currentTarget
     const formData = new FormData(form)
     try {
-      const result = await retryOnce(() =>
-        importTransactionsCsv({ data: formData }),
-      )
+      const result = await importTransactionsCsv({ data: formData })
       setSummary(result)
       form.reset()
       await router.invalidate()
@@ -96,9 +93,7 @@ function TransactionsPage() {
   }
 
   async function handleRecategorize(transactionId: string, categoryId: string) {
-    await retryOnce(() =>
-      recategorizeTransaction({ data: { transactionId, categoryId } }),
-    )
+    await recategorizeTransaction({ data: { transactionId, categoryId } })
     await router.invalidate()
   }
 
@@ -106,15 +101,13 @@ function TransactionsPage() {
     transactionId: string,
     splits: { categoryId: string; amountCents: number }[],
   ) {
-    await retryOnce(() =>
-      saveTransactionSplits({ data: { transactionId, splits } }),
-    )
+    await saveTransactionSplits({ data: { transactionId, splits } })
     await router.invalidate()
   }
 
   async function handleDelete(transactionId: string) {
     if (!confirm('Delete this transaction? This cannot be undone.')) return
-    await retryOnce(() => deleteTransaction({ data: { transactionId } }))
+    await deleteTransaction({ data: { transactionId } })
     await router.invalidate()
   }
 
